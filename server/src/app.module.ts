@@ -3,6 +3,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { Role } from './roles/entities/role.entity';
+import { User } from './users/entities/user.entity';
+import { Permission } from './permissions/entities/permission.entity';
 
 @Module({
   imports: [
@@ -29,7 +32,7 @@ import { AppService } from './app.service';
 
         // auto creates/updates tables based on our entities
         // good for development, we'll turn this off before going to production
-        synchronize: true,
+        synchronize: false,
       }),
     }),
   ],
