@@ -62,3 +62,10 @@ INSERT INTO roles (name, description) VALUES
 ('ADMIN', 'Full access to all system features and settings'),
 ('EDITOR', 'Can create and edit content, limited administrative access'),
 ('VIEWER', 'Read-only access to system data');
+
+Seed initial permissions
+
+INSERT INTO permissions (name, description) VALUES
+('USER_CREATE', 'Permission to create new users'),
+('USER_EDIT', 'Permission to edit existing users'),
+('USER_DELETE', 'Permission to delete users');
