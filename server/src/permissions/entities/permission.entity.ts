@@ -1,25 +1,28 @@
 import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
-    UpdateDateColumn
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 
-@Entity('permissions') 
+@Entity('permissions')
 export class Permission {
-    @PrimaryGeneratedColumn()
-    id: number;
+  @PrimaryGeneratedColumn()
+  id: number;
 
-    @Column({ unique: true })
-    name: string;
+  @Column({ unique: true })
+  code: string;
 
-    @Column({ nullable : true })
-    description: string;
+  @Column()
+  name: string;
 
-    @CreateDateColumn()
-    created_at: Date;
+  @Column({ nullable: true })
+  description: string;
 
-    @UpdateDateColumn()
-    updated_at: Date;    
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
 }

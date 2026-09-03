@@ -69,3 +69,17 @@ INSERT INTO permissions (name, description) VALUES
 ('USER_CREATE', 'Permission to create new users'),
 ('USER_EDIT', 'Permission to edit existing users'),
 ('USER_DELETE', 'Permission to delete users');
+
+-- Schema fix: align with spec (status naming, permissions code/name split)
+
+ALTER TABLE users CHANGE is_active status BOOLEAN NOT NULL DEFAULT true;
+
+ALTER TABLE roles ADD COLUMN status BOOLEAN NOT NULL DEFAULT true AFTER description;
+
+ALTER TABLE permissions CHANGE name code VARCHAR(255) NOT NULL;
+ALTER TABLE permissions ADD COLUMN name VARCHAR(255) NOT NULL AFTER code;
+ALTER TABLE permissions ADD UNIQUE (code);
+
+UPDATE permissions SET name = 'Create User' WHERE code = 'USER_CREATE';
+UPDATE permissions SET name = 'Edit User' WHERE code = 'USER_EDIT';
+UPDATE permissions SET name = 'Delete User' WHERE code = 'USER_DELETE';

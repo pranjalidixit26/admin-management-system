@@ -21,6 +21,9 @@ export class Role {
     @Column({ nullable: true })
     description: string;
 
+    @Column({ default: true })
+    status: boolean;
+
     @CreateDateColumn()
     created_at: Date;
 
