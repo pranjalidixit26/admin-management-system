@@ -55,3 +55,10 @@ CREATE TABLE role_permissions (
   FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
   FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
 );
+
+Seed initial roles
+
+INSERT INTO roles (name, description) VALUES
+('ADMIN', 'Full access to all system features and settings'),
+('EDITOR', 'Can create and edit content, limited administrative access'),
+('VIEWER', 'Read-only access to system data');
