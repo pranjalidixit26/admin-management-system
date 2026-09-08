@@ -2,11 +2,17 @@ import { useState } from "react";
 import UsersTable from "./UsersTable";
 import UserForm from "./UserForm";
 
+interface Role {
+  id: number;
+  name: string;
+}
+
 interface User {
   id: number;
   name: string;
   email: string;
   status: boolean;
+  roles?: Role[];
 }
 
 export default function UsersPage() {
@@ -31,7 +37,7 @@ export default function UsersPage() {
       </div>
 
       <h3>Existing Users</h3>
-      <UsersTable key={refreshKey} onEdit={setEditingUser} />
+      <UsersTable key={refreshKey} refreshKey={refreshKey} onEdit={setEditingUser} />
     </div>
   );
 }

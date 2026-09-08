@@ -1,25 +1,32 @@
 import { useState, useEffect } from "react";
-import axios from 'axios';
+import api from '../../api/axios';
+
+interface Role {
+  id: number;
+  name: string;
+}
 
 interface User {
   id: number;
   name: string;
   email: string;
   status: boolean;
+  roles?: Role[];
 }
 
 interface UsersTableProps {
   onEdit: (user: User) => void;
+  refreshKey: number;
 }
 
-export default function UsersTable({ onEdit }: UsersTableProps) {
+export default function UsersTable({ onEdit, refreshKey }: UsersTableProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await axios.get('http://localhost:3000/users');
+        const response = await api.get('/users');
         setUsers(response.data);
       } catch (err) {
         console.error('Failed to fetch users:', err);
@@ -28,14 +35,14 @@ export default function UsersTable({ onEdit }: UsersTableProps) {
       }
     };
     fetchUsers();
-  }, []);
+  }, [refreshKey]);
 
   const handleDelete = async (id: number) => {
     const confirmed = window.confirm('Are you sure you want to delete this user?');
     if (!confirmed) return;
 
     try {
-      await axios.delete(`http://localhost:3000/users/${id}`);
+      await api.delete(`/users/${id}`);
       setUsers(users.filter((user) => user.id !== id));
     } catch (err) {
       console.error('Failed to delete users:', err);
@@ -54,6 +61,7 @@ export default function UsersTable({ onEdit }: UsersTableProps) {
           <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Name</th>
           <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Email</th>
           <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Status</th>
+          <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Roles</th>
           <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Actions</th>
         </tr>
       </thead>
@@ -64,6 +72,11 @@ export default function UsersTable({ onEdit }: UsersTableProps) {
             <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>{user.email}</td>
             <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>
               {user.status ? 'Active' : 'Inactive'}
+            </td>
+            <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>
+              {user.roles && user.roles.length > 0
+                ? user.roles.map((r) => r.name).join(', ')
+                : <span style={{ color: '#999' }}>No roles</span>}
             </td>
             <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>
               <button style={{ marginRight: '8px' }} onClick={() => onEdit(user)}>Edit</button>

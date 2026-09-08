@@ -7,11 +7,15 @@ import {
     Body,
     Param,
     ParseIntPipe,
+    UseGuards
 } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { AssignPermissionsDto } from './dto/assign-permissions.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('roles')
 export class RolesController {
     constructor(private readonly rolesService: RolesService) {}
@@ -37,6 +41,14 @@ export class RolesController {
         @Body() updateRoleDto: UpdateRoleDto,
     ) {
         return this.rolesService.update(id, updateRoleDto);
+    }
+
+    @Patch(':id/permissions')
+    assignPermissions(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() assignPermissionsDto: AssignPermissionsDto,
+    ) {
+        return this.rolesService.assignPermissions(id, assignPermissionsDto.permissionIds);
     }
 
     @Delete(':id')
