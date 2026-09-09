@@ -14,12 +14,16 @@ import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { AssignPermissionsDto } from './dto/assign-permissions.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionGuard } from '../auth/permission.guard';
+import { RequirePermission } from '../auth/require-permission.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('roles')
 export class RolesController {
     constructor(private readonly rolesService: RolesService) {}
 
+    @UseGuards(PermissionGuard)
+    @RequirePermission('ROLE_CREATE')
     @Post()
     create(@Body() createRoleDto: CreateRoleDto) {
         return this.rolesService.create(createRoleDto);
@@ -35,6 +39,8 @@ export class RolesController {
         return this.rolesService.findOne(id);
     }
 
+    @UseGuards(PermissionGuard)
+    @RequirePermission('ROLE_EDIT')
     @Patch(':id')
     update(
         @Param('id', ParseIntPipe) id: number,
@@ -43,6 +49,8 @@ export class RolesController {
         return this.rolesService.update(id, updateRoleDto);
     }
 
+    @UseGuards(PermissionGuard)
+    @RequirePermission('ROLE_EDIT')
     @Patch(':id/permissions')
     assignPermissions(
         @Param('id', ParseIntPipe) id: number,
@@ -51,6 +59,8 @@ export class RolesController {
         return this.rolesService.assignPermissions(id, assignPermissionsDto.permissionIds);
     }
 
+    @UseGuards(PermissionGuard)
+    @RequirePermission('ROLE_DELETE')
     @Delete(':id')
     remove(@Param('id', ParseIntPipe) id: number) {
         return this.rolesService.remove(id);

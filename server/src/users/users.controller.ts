@@ -14,6 +14,8 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AssignRolesDto } from './dto/assign-roles.dto';
+import { PermissionGuard } from '../auth/permission.guard';
+import { RequirePermission } from '../auth/require-permission.decorator';
 
 @Controller('users')
 export class UsersController {
@@ -36,7 +38,8 @@ export class UsersController {
         return this.usersService.findOne(id);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, PermissionGuard)
+    @RequirePermission('USER_EDIT')
     @Patch(':id')
     update(
         @Param('id', ParseIntPipe) id: number,
@@ -45,7 +48,8 @@ export class UsersController {
         return this.usersService.update(id, updateUserDto);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, PermissionGuard)
+    @RequirePermission('USER_EDIT')
     @Patch(':id/roles')
     assignRoles(
         @Param('id', ParseIntPipe) id: number,
@@ -54,7 +58,8 @@ export class UsersController {
         return this.usersService.assignRoles(id, assignRolesDto.roleIds);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, PermissionGuard)
+    @RequirePermission('USER_DELETE')
     @Delete(':id')
     remove(@Param('id', ParseIntPipe) id: number){
         return this.usersService.remove(id);
