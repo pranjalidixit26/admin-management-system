@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from '../../api/axios';
+import { hasPermission } from "../../utils/permissions";
 
 interface Permission{
   id:number;
@@ -61,9 +62,13 @@ export default function PermissionsTable({onEdit, refreshKey }:PermissionsTableP
           <tr key={permission.id}>
             <td style={{padding:'10px',borderBottom:'1px solid #e2e8f0'}}>{permission.code}</td>
             <td style={{ padding:'10px',borderBottom:'1px solid #e2e8f0'}}>{permission.name}</td>
-            <td style={{padding: '10px', borderBottom:'1px solid #e2e8f0' }}>
-              <button style={{marginRight:'8px' }} onClick={() =>onEdit(permission)}>Edit</button>
-              <button onClick={()=>handleDelete(permission.id)}>Delete</button>
+            <td style={{padding:'10px',borderBottom:'1px solid #e2e8f0'}}>
+                {hasPermission('PERMISSION_EDIT')&&(
+                    <button style={{marginRight:'8px'}} onClick={()=>onEdit(permission)}>Edit</button>
+                )}
+                {hasPermission('PERMISSION_DELETE')&&(
+                    <button onClick={()=>handleDelete(permission.id)}>Delete</button>
+                )}
             </td>
           </tr>
         ))}

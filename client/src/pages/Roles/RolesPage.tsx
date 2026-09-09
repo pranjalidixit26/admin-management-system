@@ -1,6 +1,7 @@
 import { useState } from "react";
 import RoleForm from './RoleForm';
 import RolesTable from './RolesTable';
+import { hasPermission } from "../../utils/permissions";
 
 interface Permission {
   id: number;
@@ -27,11 +28,13 @@ export default function RolesPage(){
   return(
     <div>
       <h1>Roles</h1>
-      <RoleForm
-        editingRole={editingRole}
-        onSuccess={handleSuccess}
-        onCancel={() => setEditingRole(null)}
-      />
+      {(editingRole?hasPermission('ROLE_EDIT'):hasPermission('ROLE_CREATE'))&&(
+        <RoleForm
+          editingRole={editingRole}
+          onSuccess={handleSuccess}
+          onCancel={()=>setEditingRole(null)}
+        />
+      )}
       <RolesTable onEdit={setEditingRole} refreshKey={refreshKey} />
     </div>
   );

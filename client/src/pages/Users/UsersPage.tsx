@@ -1,6 +1,7 @@
 import { useState } from "react";
 import UsersTable from "./UsersTable";
 import UserForm from "./UserForm";
+import { hasPermission } from "../../utils/permissions";
 
 interface Role {
   id: number;
@@ -27,14 +28,16 @@ export default function UsersPage() {
   return (
     <div>
       <h1>Users</h1>
-      <div style={{ marginBottom: '30px' }}>
-        <h3>{editingUser ? 'Edit User' : 'Add New User'}</h3>
-        <UserForm
-          editingUser={editingUser}
-          onSuccess={handleSuccess}
-          onCancel={() => setEditingUser(null)}
-        />
-      </div>
+      {(editingUser?hasPermission('USER_EDIT'):hasPermission('USER_CREATE'))&&(
+        <div style={{marginBottom:'30px'}}>
+          <h3>{editingUser?'Edit User':'Add New User'}</h3>
+          <UserForm
+            editingUser={editingUser}
+            onSuccess={handleSuccess}
+            onCancel={()=>setEditingUser(null)}
+          />
+        </div>
+      )}
 
       <h3>Existing Users</h3>
       <UsersTable key={refreshKey} refreshKey={refreshKey} onEdit={setEditingUser} />

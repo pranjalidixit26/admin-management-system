@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from '../../api/axios';
+import { hasPermission } from "../../utils/permissions";
 
 interface Role {
   id: number;
@@ -78,9 +79,13 @@ export default function UsersTable({ onEdit, refreshKey }: UsersTableProps) {
                 ? user.roles.map((r) => r.name).join(', ')
                 : <span style={{ color: '#999' }}>No roles</span>}
             </td>
-            <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>
-              <button style={{ marginRight: '8px' }} onClick={() => onEdit(user)}>Edit</button>
-              <button onClick={() => handleDelete(user.id)}>Delete</button>
+            <td style={{padding:'10px',borderBottom:'1px solid #e2e8f0'}}>
+                {hasPermission('USER_EDIT')&&(
+                    <button style={{marginRight:'8px'}} onClick={()=>onEdit(user)}>Edit</button>
+                )}
+                {hasPermission('USER_DELETE')&&(
+                    <button onClick={()=>handleDelete(user.id)}>Delete</button>
+                )}
             </td>
           </tr>
         ))}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import PermissionForm from './PermissionForm';
 import PermissionsTable from './PermissionsTable';
+import { hasPermission } from "../../utils/permissions";
 
 interface Permission {
   id:number;
@@ -20,11 +21,13 @@ export default function PermissionsPage(){
   return(
     <div>
       <h1>Permissions</h1>
-      <PermissionForm
-        editingPermission={editingPermission}
-        onSuccess={handleSuccess}
-        onCancel={() => setEditingPermission(null)}
-      />
+      {(editingPermission?hasPermission('PERMISSION_EDIT'):hasPermission('PERMISSION_CREATE'))&&(
+        <PermissionForm
+            editingPermission={editingPermission}
+            onSuccess={handleSuccess}
+            onCancel={()=>setEditingPermission(null)}
+        />
+      )}
       <PermissionsTable onEdit={setEditingPermission} refreshKey={refreshKey}/>
     </div>
   );

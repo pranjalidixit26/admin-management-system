@@ -5,7 +5,6 @@ import axios from 'axios';
 export default function Login() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
 
-  // Login state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -31,6 +30,7 @@ export default function Login() {
 
       localStorage.setItem('access_token', response.data.access_token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
+      localStorage.setItem('permissions',JSON.stringify(response.data.permissions??[]));
 
       navigate('/');
     } catch (err) {
