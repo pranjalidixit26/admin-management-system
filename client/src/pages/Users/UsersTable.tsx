@@ -23,6 +23,7 @@ interface UsersTableProps {
 export default function UsersTable({ onEdit, refreshKey }: UsersTableProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const showActions=hasPermission('USER_EDIT')||hasPermission('USER_DELETE');
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -63,7 +64,9 @@ export default function UsersTable({ onEdit, refreshKey }: UsersTableProps) {
           <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Email</th>
           <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Status</th>
           <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Roles</th>
-          <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Actions</th>
+          {showActions && (
+            <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Actions</th>
+           )}
         </tr>
       </thead>
       <tbody>
@@ -79,6 +82,7 @@ export default function UsersTable({ onEdit, refreshKey }: UsersTableProps) {
                 ? user.roles.map((r) => r.name).join(', ')
                 : <span style={{ color: '#999' }}>No roles</span>}
             </td>
+            {showActions && (
             <td style={{padding:'10px',borderBottom:'1px solid #e2e8f0'}}>
                 {hasPermission('USER_EDIT')&&(
                     <button style={{marginRight:'8px'}} onClick={()=>onEdit(user)}>Edit</button>
@@ -87,6 +91,7 @@ export default function UsersTable({ onEdit, refreshKey }: UsersTableProps) {
                     <button onClick={()=>handleDelete(user.id)}>Delete</button>
                 )}
             </td>
+            )}
           </tr>
         ))}
       </tbody>

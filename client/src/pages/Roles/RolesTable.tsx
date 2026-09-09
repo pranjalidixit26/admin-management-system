@@ -23,6 +23,7 @@ interface RolesTableProps{
 export default function RolesTable({ onEdit, refreshKey }:RolesTableProps){
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] =useState(true);
+  const showActions=hasPermission('ROLE_EDIT')||hasPermission('ROLE_DELETE');
 
   useEffect(() => {
     const fetchRoles = async () => {
@@ -74,7 +75,9 @@ export default function RolesTable({ onEdit, refreshKey }:RolesTableProps){
           <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Name</th>
           <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Status</th>
           <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Permissions</th>
-          <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Actions</th>
+          {showActions && (
+            <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Actions</th>
+           )}
         </tr>
       </thead>
       <tbody>
@@ -97,14 +100,16 @@ export default function RolesTable({ onEdit, refreshKey }:RolesTableProps){
                 ? role.permissions.map((p) => p.code).join(', ')
                 : <span style={{ color: '#999' }}>No permissions</span>}
             </td>
-            <td style={{padding:'10px', borderBottom:'1px solid #e2e8f0'}}>
-                {hasPermission('ROLE_EDIT')&&(
-                    <button style={{marginRight:'8px'}} onClick={()=>onEdit(role)}>Edit</button>
-                )}
-                {hasPermission('ROLE_DELETE')&&(
-                    <button onClick={()=>handleDelete(role.id)}>Delete</button>
-                )}
-            </td>
+            {showActions && (
+                <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>
+                    {hasPermission('ROLE_EDIT') && (
+                    <button style={{ marginRight: '8px' }} onClick={() => onEdit(role)}>Edit</button>
+                    )}
+                    {hasPermission('ROLE_DELETE') && (
+                    <button onClick={() => handleDelete(role.id)}>Delete</button>
+                    )}
+                </td>
+            )}
           </tr>
         ))}
       </tbody>

@@ -16,6 +16,7 @@ interface PermissionsTableProps{
 export default function PermissionsTable({onEdit, refreshKey }:PermissionsTableProps) {
   const [permissions,setPermissions]=useState<Permission[]>([]);
   const [loading, setLoading] =useState(true);
+  const showActions = hasPermission('PERMISSION_EDIT') || hasPermission('PERMISSION_DELETE');
 
   useEffect(()=>{
     const fetchPermissions=async ()=>{
@@ -54,7 +55,9 @@ export default function PermissionsTable({onEdit, refreshKey }:PermissionsTableP
         <tr>
           <th style={{ textAlign:'left',padding:'10px',borderBottom:'2px solid #e2e8f0'}}>Code</th>
           <th style={{textAlign:'left',padding:'10px',borderBottom:'2px solid #e2e8f0'}}>Name</th>
-          <th style={{ textAlign:'left',padding:'10px',borderBottom: '2px solid #e2e8f0'}}>Actions</th>
+          {showActions && (
+            <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Actions</th>
+           )}
         </tr>
       </thead>
       <tbody>
@@ -62,14 +65,16 @@ export default function PermissionsTable({onEdit, refreshKey }:PermissionsTableP
           <tr key={permission.id}>
             <td style={{padding:'10px',borderBottom:'1px solid #e2e8f0'}}>{permission.code}</td>
             <td style={{ padding:'10px',borderBottom:'1px solid #e2e8f0'}}>{permission.name}</td>
-            <td style={{padding:'10px',borderBottom:'1px solid #e2e8f0'}}>
-                {hasPermission('PERMISSION_EDIT')&&(
-                    <button style={{marginRight:'8px'}} onClick={()=>onEdit(permission)}>Edit</button>
+            {showActions && (
+            <td style={{padding: '10px', borderBottom:'1px solid #e2e8f0' }}>
+                {hasPermission('PERMISSION_EDIT') && (
+                <button style={{marginRight:'8px' }} onClick={() =>onEdit(permission)}>Edit</button>
                 )}
-                {hasPermission('PERMISSION_DELETE')&&(
-                    <button onClick={()=>handleDelete(permission.id)}>Delete</button>
+                {hasPermission('PERMISSION_DELETE') && (
+                <button onClick={()=>handleDelete(permission.id)}>Delete</button>
                 )}
             </td>
+            )}
           </tr>
         ))}
       </tbody>
