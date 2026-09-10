@@ -1,6 +1,6 @@
 import { Injectable , NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, In } from 'typeorm';
+import { Repository, In, Like } from 'typeorm';
 import { Role } from './entities/role.entity';
 import { Permission } from '../permissions/entities/permission.entity';
 import { CreateRoleDto } from "./dto/create-role.dto";
@@ -20,10 +20,21 @@ export class RolesService {
         return this.roleRepository.save(role);
     }
 
-    async findAll(): Promise<Role[]> {
-        return this.roleRepository.find({
-            relations: { permissions: true },
+    async findAll(page=1,limit=10,search?:string){
+        const[data,total]=await this.roleRepository.findAndCount({
+            relations:{permissions:true},
+            where:search?{name:Like(`%${search}%`)}:{},
+            skip:(page-1)*limit,
+            take:limit,
+            order:{id:'ASC'},
         });
+        return{
+            data,
+            total,
+            page,
+            limit,
+            totalPages:Math.ceil(total/limit),
+        };
     }
 
     async findOne(id: number): Promise<Role> {

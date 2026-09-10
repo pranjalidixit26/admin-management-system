@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from '../../api/axios';
+import Button from '../../components/Button';
 
 interface Permission {
   id: number;
@@ -41,8 +42,8 @@ export default function RoleForm({ editingRole, onSuccess, onCancel }: RoleFormP
     if (!editingRole) return;
     const fetchPermissions = async () => {
       try {
-        const response = await api.get('/permissions');
-        setAllPermissions(response.data);
+        const response = await api.get('/permissions', { params: { limit: 100 } });
+        setAllPermissions(response.data.data);
       } catch (err) {
         console.error('Failed to fetch permissions:', err);
       }
@@ -86,12 +87,12 @@ export default function RoleForm({ editingRole, onSuccess, onCancel }: RoleFormP
         required
         style={{marginRight:'8px',padding:'6px' }}
       />
-      <button type="submit">{editingRole?'Update':'Create'}</button>
-      {editingRole &&(
-        <button type="button" onClick={onCancel} style={{marginLeft:'8px'}}>
-          Cancel
-        </button>
-      )}
+      <Button type="submit">{editingRole?'Update':'Create'}</Button>
+        {editingRole &&(
+        <Button type="button" variant="secondary" onClick={onCancel} style={{marginLeft:'8px'}}>
+            Cancel
+        </Button>
+        )}
 
       {editingRole && (
         <div style={{ marginTop: '12px' }}>

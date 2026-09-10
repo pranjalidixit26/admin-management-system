@@ -6,12 +6,15 @@ import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import RolesPage from './pages/Roles/RolesPage';
 import PermissionsPage from './pages/Permissions/PermissionsPage';
+import GuestRoute from './components/GuestRoute';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login/>} />
+        <Route element={<GuestRoute/>}>
+        <Route path="/login" element={<Login/>}/>
+        </Route>
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<AppLayout />}>
             <Route index element={<Dashboard />} />

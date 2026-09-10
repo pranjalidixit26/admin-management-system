@@ -8,6 +8,7 @@ import {
   Param,
   ParseIntPipe,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { PermissionsService } from './permissions.service';
 import { CreatePermissionDto } from './dto/create-permission.dto';
@@ -30,9 +31,17 @@ export class PermissionsController {
   }
 
   @Get()
-  findAll() {
-    return this.permissionsService.findAll();
-  }
+    findAll(
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('search') search?: string,
+    ) {
+        return this.permissionsService.findAll(
+            page ? parseInt(page) : 1,
+            limit ? parseInt(limit) : 10,
+            search,
+        );
+    }
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, In } from 'typeorm';
+import { Repository, In, Like} from 'typeorm';
 import { User } from './entities/user.entity';
 import { Role } from '../roles/entities/role.entity';
 import { CreateUserDto } from "./dto/create-user.dto";
@@ -25,10 +25,22 @@ export class UsersService {
         return this.userRepository.save(user);
     }
 
-    async findAll(): Promise<User[]> {
-        return this.userRepository.find({
-            relations: { roles: true },
+    async findAll(page=1, limit=10, search?:string){
+        const [data,total]=await this.userRepository.findAndCount({
+            relations:{roles:true},
+            where:search?{name:Like(`%${search}%`)}:{},
+            skip:(page-1)*limit,
+            take:limit,
+            order:{id:'ASC'},
         });
+
+        return{
+            data,
+            total,
+            page,
+            limit,
+            totalPages:Math.ceil(total/limit),
+        };
     }
 
     async findOne(id: number): Promise<User> {

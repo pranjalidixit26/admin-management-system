@@ -8,6 +8,7 @@ import {
     Param,
     ParseIntPipe,
     UseGuards,
+    Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -28,8 +29,16 @@ export class UsersController {
 
     @UseGuards(JwtAuthGuard)
     @Get()
-    findAll() {
-        return this.usersService.findAll();
+    findAll(
+        @Query('page') page?:string,
+        @Query('limit') limit?:string,
+        @Query('search') search?:string,
+    ){
+        return this.usersService.findAll(
+            page?parseInt(page):1,
+            limit?parseInt(limit):10,
+            search,
+        );
     }
 
     @UseGuards(JwtAuthGuard)

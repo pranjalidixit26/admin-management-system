@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from '../../api/axios';
+import Button from '../../components/Button';
 
 interface Permission {
   id:number;
@@ -65,11 +66,11 @@ export default function PermissionForm({editingPermission,onSuccess,onCancel}:Pe
         required
         style={{marginRight:'8px',padding:'6px' }}
       />
-      <button type="submit">{editingPermission?'Update': 'Create'}</button>
+      <Button type="submit">{editingPermission?'Update': 'Create'}</Button>
       {editingPermission && (
-        <button type="button" onClick={onCancel} style={{ marginLeft: '8px' }}>
+        <Button type="button" variant="secondary" onClick={onCancel} style={{ marginLeft: '8px' }}>
           Cancel
-        </button>
+        </Button>
       )}
       {error &&<p style={{ color: 'red' }}>{error}</p>}
     </form>

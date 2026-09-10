@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from '../../api/axios';
+import Button from '../../components/Button';
 
 interface Role {
   id: number;
@@ -48,8 +49,8 @@ export default function UserForm({ editingUser, onSuccess, onCancel }: UserFormP
     if (!editingUser) return;
     const fetchRoles = async () => {
       try {
-        const response = await axios.get('/roles');
-        setAllRoles(response.data);
+        const response = await axios.get('/roles', { params: { limit: 100 } });
+        setAllRoles(response.data.data);
       } catch (err) {
         console.error('Failed to fetch roles:', err);
       }
@@ -148,12 +149,12 @@ export default function UserForm({ editingUser, onSuccess, onCancel }: UserFormP
         </div>
       )}
 
-      <button type="submit">{editingUser ? 'Update User' : 'Create User'}</button>
-      {editingUser && (
-        <button type="button" onClick={onCancel} style={{ marginLeft: '8px' }}>
-          Cancel
-        </button>
-      )}
+      <Button type="submit">{editingUser ? 'Update User' : 'Create User'}</Button>
+        {editingUser && (
+        <Button type="button" variant="secondary" onClick={onCancel} style={{ marginLeft: '8px' }}>
+            Cancel
+        </Button>
+        )}
     </form>
   );
 }

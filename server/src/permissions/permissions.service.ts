@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Like } from 'typeorm';
 import { Permission } from './entities/permission.entity';
 import { CreatePermissionDto } from './dto/create-permission.dto';
 import { UpdatePermissionDto } from './dto/update-permission.dto';
@@ -17,9 +17,22 @@ export class PermissionsService {
     return this.permissionRepository.save(permission);
   }
 
-  async findAll(): Promise<Permission[]> {
-    return this.permissionRepository.find();
-  }
+  async findAll(page = 1, limit = 10, search?: string) {
+    const [data, total] = await this.permissionRepository.findAndCount({
+        where: search ? { code: Like(`%${search}%`) } : {},
+        skip: (page - 1) * limit,
+        take: limit,
+        order: { id: 'ASC' },
+    });
+
+    return {
+        data,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+    };
+}
 
   async findOne(id: number): Promise<Permission> {
     const permission = await this.permissionRepository.findOne({ where: { id } });

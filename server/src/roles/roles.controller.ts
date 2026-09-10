@@ -7,7 +7,8 @@ import {
     Body,
     Param,
     ParseIntPipe,
-    UseGuards
+    UseGuards,
+    Query,
 } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
@@ -23,15 +24,23 @@ export class RolesController {
     constructor(private readonly rolesService: RolesService) {}
 
     @UseGuards(PermissionGuard)
-    @RequirePermission('ROLE_CREATE')
+    @RequirePermission('ROLE_CREATE') 
     @Post()
     create(@Body() createRoleDto: CreateRoleDto) {
         return this.rolesService.create(createRoleDto);
     }
 
     @Get()
-    findAll() {
-        return this.rolesService.findAll();
+    findAll(
+        @Query('page') page?:string,
+        @Query('limit') limit?:string,
+        @Query('search') search?:string,
+    ){
+        return this.rolesService.findAll(
+            page?parseInt(page):1,
+            limit?parseInt(limit):10,
+            search,
+        );
     }
 
     @Get(':id')
@@ -52,7 +61,7 @@ export class RolesController {
     @UseGuards(PermissionGuard)
     @RequirePermission('ROLE_EDIT')
     @Patch(':id/permissions')
-    assignPermissions(
+    assignPermissions( 
         @Param('id', ParseIntPipe) id: number,
         @Body() assignPermissionsDto: AssignPermissionsDto,
     ) {
