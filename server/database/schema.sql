@@ -83,3 +83,14 @@ ALTER TABLE permissions ADD UNIQUE (code);
 UPDATE permissions SET name = 'Create User' WHERE code = 'USER_CREATE';
 UPDATE permissions SET name = 'Edit User' WHERE code = 'USER_EDIT';
 UPDATE permissions SET name = 'Delete User' WHERE code = 'USER_DELETE';
+
+
+-- Categories table
+CREATE TABLE categories (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  description VARCHAR(255) NULL,
+  status BOOLEAN NOT NULL DEFAULT true,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+);
