@@ -17,18 +17,33 @@ import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 
 @Controller('products')
-@UseGuards(JwtAuthGuard)
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
-  @UseGuards(PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('PRODUCT_CREATE')
   create(@Body() createProductDto: CreateProductDto) {
     return this.productsService.create(createProductDto);
   }
 
+  @Get('public')
+  findPublic(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('categoryId') categoryId?: string,
+  ) {
+    return this.productsService.findPublic(
+      page ? +page : 1,
+      limit ? +limit : 12,
+      search,
+      categoryId ? +categoryId : undefined,
+    );
+  }
+
   @Get()
+  @UseGuards(JwtAuthGuard)
   findAll(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -42,19 +57,20 @@ export class ProductsController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
   findOne(@Param('id') id: string) {
     return this.productsService.findOne(+id);
   }
 
   @Patch(':id')
-  @UseGuards(PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('PRODUCT_EDIT')
   update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
     return this.productsService.update(+id, updateProductDto);
   }
 
   @Delete(':id')
-  @UseGuards(PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('PRODUCT_DELETE')
   remove(@Param('id') id: string) {
     return this.productsService.remove(+id);

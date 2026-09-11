@@ -50,6 +50,28 @@ export class ProductsService {
     return product;
   }
 
+  async findPublic(page = 1, limit = 12, search?: string, categoryId?: number) {
+    const where: any = { status: true };
+    if (search) where.name = Like(`%${search}%`);
+    if (categoryId) where.category = { id: categoryId };
+
+    const [data, total] = await this.productRepository.findAndCount({
+      where,
+      relations: { category: true },
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { id: 'DESC' },
+    });
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
   async update(id: number, updateProductDto: UpdateProductDto): Promise<Product> {
     const product = await this.findOne(id);
     const { categoryId, ...rest } = updateProductDto;
