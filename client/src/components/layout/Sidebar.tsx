@@ -2,10 +2,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { theme } from '../../theme';
 
 const navItems = [
-  { label: 'Dashboard', path: '/' },
+  { label: 'Dashboard', path: '/dashboard' },
   { label: 'Users', path: '/users' },
   { label: 'Roles', path: '/roles' },
   { label: 'Permissions', path: '/permissions' },
+  { label: 'Categories', path: '/categories' },
+  { label: 'Products', path: '/products' },
 ];
 
 export default function Sidebar() {

@@ -20,14 +20,21 @@ export class Product{
     @Column({nullable:true})
     description:string;
 
-    @Column('decimal',{precision:10,scale:2})
-    price:number;
+    @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    transformer: {
+        to: (value: number) => value,
+        from: (value: string) => parseFloat(value),
+    },
+    })
+    price: number;
 
     @Column({default:0})
     stock:number;
 
-    @Column({nullable:true})
-    imageUrl:string;
+    @Column({ type: 'text', nullable: true })
+    imageUrl: string;
 
     @ManyToOne(()=>Category)
     @JoinColumn({name:'category_id'})

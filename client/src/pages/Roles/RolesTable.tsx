@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
+import { Table, Input, Switch, Popconfirm, message, Space, Button, Tag, Tooltip, Empty } from "antd";
+import type { ColumnsType } from "antd/es/table";
+import { SearchOutlined, EditOutlined, DeleteOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
 import api from '../../api/axios';
 import { hasPermission } from "../../utils/permissions";
-import Button from '../../components/Button';
 
 interface Permission {
   id: number;
@@ -9,141 +11,182 @@ interface Permission {
   name: string;
 }
 
-interface Role{
+interface Role {
   id: number;
   name: string;
   status: boolean;
   permissions?: Permission[];
 }
 
-interface RolesTableProps{
-  onEdit: (role: Role)=>void;
-  refreshKey:number;
+interface RolesTableProps {
+  onEdit: (role: Role) => void;
+  refreshKey: number;
 }
 
-export default function RolesTable({ onEdit, refreshKey }:RolesTableProps){
+const MAX_VISIBLE_PERMISSIONS = 3;
+
+export default function RolesTable({ onEdit, refreshKey }: RolesTableProps) {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize] = useState(5);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
-  const showActions=hasPermission('ROLE_EDIT')||hasPermission('ROLE_DELETE');
+  const showActions = hasPermission('ROLE_EDIT') || hasPermission('ROLE_DELETE');
 
   useEffect(() => {
     const fetchRoles = async () => {
       setLoading(true);
       try {
         const response = await api.get('/roles', {
-          params: { page, limit: 5, search: search || undefined },
+          params: { page, limit: pageSize, search: search || undefined },
         });
         setRoles(response.data.data);
-        setTotalPages(response.data.totalPages);
-      } catch (err){
+        setTotal(response.data.total ?? response.data.data.length);
+      } catch (err) {
         console.error('Failed to fetch roles:', err);
+        message.error('Failed to load roles.');
       } finally {
         setLoading(false);
       }
     };
     fetchRoles();
-  }, [refreshKey, page, search]);
+  }, [refreshKey, page, pageSize, search]);
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
     setPage(1);
   };
 
-  const handleDelete= async (id: number) => {
-    const confirmed =window.confirm('Are you sure you want to delete this role?');
-    if (!confirmed) return;
-
-    try{
-      await api.delete(`/roles/${id}`);
-      setRoles(roles.filter((role) => role.id !== id));
-    }catch (err) {
-      console.error('Failed to delete role:', err);
-      alert('Failed to delete role.');
-    }
-  };
-
-  const handleToggleStatus = async (role:Role)=>{
+  const handleDelete = async (id: number) => {
     try {
-      const response =await api.patch(`/roles/${role.id}`, {
-        status:!role.status,
-      });
-      setRoles(roles.map((r)=>(r.id === role.id?response.data : r)));
-    }catch (err){
-      console.error('Failed to update status:',err);
-      alert('Failed to update role status.');
+      await api.delete(`/roles/${id}`);
+      setRoles((prev) => prev.filter((role) => role.id !== id));
+      message.success('Role deleted successfully.');
+    } catch (err) {
+      console.error('Failed to delete role:', err);
+      message.error('Failed to delete role.');
     }
   };
+
+  const handleToggleStatus = async (role: Role) => {
+    try {
+      const response = await api.patch(`/roles/${role.id}`, { status: !role.status });
+      setRoles((prev) => prev.map((r) => (r.id === role.id ? response.data : r)));
+    } catch (err) {
+      console.error('Failed to update status:', err);
+      message.error('Failed to update role status.');
+    }
+  };
+
+  const columns: ColumnsType<Role> = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (name: string) => (
+        <Space>
+          <SafetyCertificateOutlined style={{ color: '#6366f1', fontSize: 16 }} />
+          <span style={{ fontWeight: 500 }}>{name}</span>
+        </Space>
+      ),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: boolean, role) => (
+        <Switch
+          checked={status}
+          checkedChildren="Active"
+          unCheckedChildren="Inactive"
+          onChange={() => handleToggleStatus(role)}
+        />
+      ),
+    },
+    {
+      title: 'Permissions',
+      dataIndex: 'permissions',
+      key: 'permissions',
+      render: (permissions?: Permission[]) => {
+        if (!permissions || permissions.length === 0) {
+          return <span style={{ color: '#999' }}>No permissions</span>;
+        }
+        const visible = permissions.slice(0, MAX_VISIBLE_PERMISSIONS);
+        const remaining = permissions.length - visible.length;
+        return (
+          <Space size={4} wrap>
+            {visible.map((p) => (
+              <Tag key={p.id} color="geekblue" style={{ borderRadius: 12, margin: 0 }}>
+                {p.code}
+              </Tag>
+            ))}
+            {remaining > 0 && (
+              <Tooltip title={permissions.slice(MAX_VISIBLE_PERMISSIONS).map((p) => p.code).join(', ')}>
+                <Tag style={{ borderRadius: 12, margin: 0, cursor: 'default' }}>+{remaining} more</Tag>
+              </Tooltip>
+            )}
+          </Space>
+        );
+      },
+    },
+  ];
+
+  if (showActions) {
+    columns.push({
+      title: 'Actions',
+      key: 'actions',
+      render: (_, role) => (
+        <Space>
+          {hasPermission('ROLE_EDIT') && (
+            <Tooltip title="Edit">
+              <Button shape="circle" icon={<EditOutlined />} onClick={() => onEdit(role)} />
+            </Tooltip>
+          )}
+          {hasPermission('ROLE_DELETE') && (
+            <Popconfirm
+              title="Delete this role?"
+              description="This action cannot be undone."
+              okText="Delete"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => handleDelete(role.id)}
+            >
+              <Tooltip title="Delete">
+                <Button shape="circle" danger icon={<DeleteOutlined />} />
+              </Tooltip>
+            </Popconfirm>
+          )}
+        </Space>
+      ),
+    });
+  }
 
   return (
     <div>
-      <input
-        type="text"
+      <Input
         placeholder="Search by name..."
+        prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
         value={search}
         onChange={(e) => handleSearchChange(e.target.value)}
-        style={{ marginBottom: '12px', padding: '8px', width: '250px' }}
+        style={{ marginBottom: 16, width: 280, borderRadius: 8 }}
+        allowClear
       />
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Name</th>
-            <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Status</th>
-            <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Permissions</th>
-            {showActions && (
-              <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Actions</th>
-             )}
-          </tr>
-        </thead>
-        <tbody>
-          {loading ? (
-            <tr>
-              <td colSpan={showActions ? 4 : 3} style={{ padding: '10px', textAlign: 'center' }}>
-                Loading...
-              </td>
-            </tr>
-          ) : (
-            roles.map((role) => (
-              <tr key={role.id}>
-                <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>{role.name}</td>
-                <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>
-                  <label style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={role.status}
-                      onChange={() => handleToggleStatus(role)}
-                      style={{ marginRight: '8px' }}
-                    />
-                    {role.status ? 'Active' : 'Inactive'}
-                  </label>
-                </td>
-                <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>
-                  {role.permissions && role.permissions.length > 0
-                    ? role.permissions.map((p) => p.code).join(', ')
-                    : <span style={{ color: '#999' }}>No permissions</span>}
-                </td>
-                {showActions && (
-                <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>
-                    {hasPermission('ROLE_EDIT') && (
-                    <Button variant="secondary" style={{ marginRight: '8px' }} onClick={() => onEdit(role)}>Edit</Button>
-                    )}
-                    {hasPermission('ROLE_DELETE') && (
-                    <Button variant="danger" onClick={() => handleDelete(role.id)}>Delete</Button>
-                    )}
-                </td>
-            )}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-      <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</button>
-        <span>Page {page} of {totalPages}</span>
-        <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</button>
-      </div>
+      <Table
+        rowKey="id"
+        columns={columns}
+        dataSource={roles}
+        loading={loading}
+        pagination={{ current: page, pageSize, total, onChange: (p) => setPage(p) }}
+        locale={{
+          emptyText: (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={search ? `No roles found for "${search}"` : 'No roles yet'}
+              style={{ padding: '32px 0' }}
+            />
+          ),
+        }}
+      />
     </div>
   );
 }

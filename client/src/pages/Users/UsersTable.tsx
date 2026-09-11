@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
+import { Table, Input, Switch, Popconfirm, message, Space, Button, Tag, Avatar, Tooltip, Empty } from "antd";
+import type { ColumnsType } from "antd/es/table";
+import { SearchOutlined, EditOutlined, DeleteOutlined, UserOutlined } from "@ant-design/icons";
 import api from '../../api/axios';
 import { hasPermission } from "../../utils/permissions";
-import Button from '../../components/Button';
 
 interface Role {
   id: number;
@@ -21,11 +23,37 @@ interface UsersTableProps {
   refreshKey: number;
 }
 
+// Consistent color per role name so the same role always looks the same.
+const ROLE_COLORS: Record<string, string> = {
+  ADMIN: 'purple',
+  EDITOR: 'blue',
+  VIEWER: 'green',
+};
+
+const getRoleColor = (name: string) => ROLE_COLORS[name.toUpperCase()] ?? 'default';
+
+const getInitials = (name: string) =>
+  name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+
+// Deterministic soft color for an avatar background, based on the name.
+const AVATAR_COLORS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const getAvatarColor = (name: string) => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+};
+
 export default function UsersTable({ onEdit, refreshKey }: UsersTableProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize] = useState(5);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
   const showActions = hasPermission('USER_EDIT') || hasPermission('USER_DELETE');
 
@@ -34,18 +62,19 @@ export default function UsersTable({ onEdit, refreshKey }: UsersTableProps) {
       setLoading(true);
       try {
         const response = await api.get('/users', {
-          params: { page, limit: 5, search: search || undefined },
+          params: { page, limit: pageSize, search: search || undefined },
         });
         setUsers(response.data.data);
-        setTotalPages(response.data.totalPages);
+        setTotal(response.data.total ?? response.data.data.length);
       } catch (err) {
         console.error('Failed to fetch users:', err);
+        message.error('Failed to load users.');
       } finally {
         setLoading(false);
       }
     };
     fetchUsers();
-  }, [refreshKey, page, search]);
+  }, [refreshKey, page, pageSize, search]);
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
@@ -53,79 +82,128 @@ export default function UsersTable({ onEdit, refreshKey }: UsersTableProps) {
   };
 
   const handleDelete = async (id: number) => {
-    const confirmed = window.confirm('Are you sure you want to delete this user?');
-    if (!confirmed) return;
-
     try {
       await api.delete(`/users/${id}`);
-      setUsers(users.filter((user) => user.id !== id));
+      setUsers((prev) => prev.filter((user) => user.id !== id));
+      message.success('User deleted successfully.');
     } catch (err) {
-      console.error('Failed to delete users:', err);
-      alert('Failed to delete user.');
+      console.error('Failed to delete user:', err);
+      message.error('Failed to delete user.');
     }
   };
 
+  const handleToggleStatus = async (user: User) => {
+    try {
+      const response = await api.patch(`/users/${user.id}`, { status: !user.status });
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, ...response.data } : u)));
+    } catch (err) {
+      console.error('Failed to update status:', err);
+      message.error('Failed to update user status.');
+    }
+  };
+
+  const columns: ColumnsType<User> = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (name: string) => (
+        <Space>
+          <Avatar style={{ backgroundColor: getAvatarColor(name) }} icon={!name ? <UserOutlined /> : undefined}>
+            {name ? getInitials(name) : null}
+          </Avatar>
+          <span style={{ fontWeight: 500 }}>{name}</span>
+        </Space>
+      ),
+    },
+    { title: 'Email', dataIndex: 'email', key: 'email' },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: boolean, user) => (
+        <Switch
+          checked={status}
+          checkedChildren="Active"
+          unCheckedChildren="Inactive"
+          onChange={() => handleToggleStatus(user)}
+        />
+      ),
+    },
+    {
+      title: 'Roles',
+      dataIndex: 'roles',
+      key: 'roles',
+      render: (roles?: Role[]) =>
+        roles && roles.length > 0 ? (
+          <Space size={4} wrap>
+            {roles.map((r) => (
+              <Tag key={r.id} color={getRoleColor(r.name)} style={{ borderRadius: 12, margin: 0 }}>
+                {r.name}
+              </Tag>
+            ))}
+          </Space>
+        ) : (
+          <span style={{ color: '#999' }}>No roles</span>
+        ),
+    },
+  ];
+
+  if (showActions) {
+    columns.push({
+      title: 'Actions',
+      key: 'actions',
+      render: (_, user) => (
+        <Space>
+          {hasPermission('USER_EDIT') && (
+            <Tooltip title="Edit">
+              <Button shape="circle" icon={<EditOutlined />} onClick={() => onEdit(user)} />
+            </Tooltip>
+          )}
+          {hasPermission('USER_DELETE') && (
+            <Popconfirm
+              title="Delete this user?"
+              description="This action cannot be undone."
+              okText="Delete"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => handleDelete(user.id)}
+            >
+              <Tooltip title="Delete">
+                <Button shape="circle" danger icon={<DeleteOutlined />} />
+              </Tooltip>
+            </Popconfirm>
+          )}
+        </Space>
+      ),
+    });
+  }
+
   return (
     <div>
-      <input
-        type="text"
+      <Input
         placeholder="Search by name..."
+        prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
         value={search}
         onChange={(e) => handleSearchChange(e.target.value)}
-        style={{ marginBottom: '12px', padding: '8px', width: '250px' }}
+        style={{ marginBottom: 16, width: 280, borderRadius: 8 }}
+        allowClear
       />
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Name</th>
-            <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Email</th>
-            <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Status</th>
-            <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Roles</th>
-            {showActions && (
-              <th style={{ textAlign: 'left', padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Actions</th>
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {loading ? (
-            <tr>
-              <td colSpan={showActions ? 5 : 4} style={{ padding: '10px', textAlign: 'center' }}>
-                Loading...
-              </td>
-            </tr>
-          ) : (
-            users.map((user) => (
-              <tr key={user.id}>
-                <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>{user.name}</td>
-                <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>{user.email}</td>
-                <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>
-                  {user.status ? 'Active' : 'Inactive'}
-                </td>
-                <td style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>
-                  {user.roles && user.roles.length > 0
-                    ? user.roles.map((r) => r.name).join(', ')
-                    : <span style={{ color: '#999' }}>No roles</span>}
-                </td>
-                {showActions && (
-                <td style={{padding:'10px',borderBottom:'1px solid #e2e8f0'}}>
-                    {hasPermission('USER_EDIT')&&(
-                        <Button variant="secondary" style={{marginRight:'8px'}} onClick={()=>onEdit(user)}>Edit</Button>
-                    )}
-                    {hasPermission('USER_DELETE')&&(
-                        <Button variant="danger" onClick={()=>handleDelete(user.id)}>Delete</Button>
-                    )}
-                </td>
-                )}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-      <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</button>
-        <span>Page {page} of {totalPages}</span>
-        <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</button>
-      </div>
+      <Table
+        rowKey="id"
+        columns={columns}
+        dataSource={users}
+        loading={loading}
+        pagination={{ current: page, pageSize, total, onChange: (p) => setPage(p) }}
+        locale={{
+          emptyText: (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={search ? `No users found for "${search}"` : 'No users yet'}
+              style={{ padding: '32px 0' }}
+            />
+          ),
+        }}
+      />
     </div>
   );
 }

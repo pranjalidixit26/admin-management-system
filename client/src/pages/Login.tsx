@@ -1,268 +1,208 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { Card, Tabs, Form, Input, Button, Alert } from 'antd';
 import axios from 'axios';
+import { theme } from '../theme';
+import NetworkBackground from '../components/NetworkBackground';
+
+interface LoginValues {
+  email: string;
+  password: string;
+}
+
+interface SignupValues {
+  name: string;
+  email: string;
+  password: string;
+}
 
 export default function Login() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-
-  // Signup state
-  const [signupName, setSignupName] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
   const [signupError, setSignupError] = useState('');
-  const [signupSuccess, setSignupSuccess] = useState('');
-
+  const [signupSuccess, setSignupSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (values: LoginValues) => {
     setError('');
-
+    setSubmitting(true);
     try {
-      const response = await axios.post('http://localhost:3000/auth/login', {
-        email,
-        password,
-      });
-
+      const response = await axios.post('http://localhost:3000/auth/login', values);
       localStorage.setItem('access_token', response.data.access_token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
-      localStorage.setItem('permissions',JSON.stringify(response.data.permissions??[]));
-
-      navigate('/');
-    } catch (err) {
+      localStorage.setItem('permissions', JSON.stringify(response.data.permissions ?? []));
+      navigate('/dashboard');
+    } catch {
       setError('Invalid email or password');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSignup = async (values: SignupValues) => {
     setSignupError('');
-    setSignupSuccess('');
-
+    setSignupSuccess(false);
+    setSubmitting(true);
     try {
-      await axios.post('http://localhost:3000/users', {
-        name: signupName,
-        email: signupEmail,
-        password: signupPassword,
-      });
-
-      setSignupSuccess('Account created! You can now sign in.');
-      setSignupName('');
-      setSignupEmail('');
-      setSignupPassword('');
+      await axios.post('http://localhost:3000/users', values);
+      setSignupSuccess(true);
       setMode('login');
-    } catch (err) {
+    } catch {
       setSignupError('Failed to create account. Email may already be in use.');
+    } finally {
+      setSubmitting(false);
     }
-  };
-
-  const tabStyle = (active: boolean) => ({
-    flex: 1,
-    padding: '10px',
-    textAlign: 'center' as const,
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: 500,
-    color: active ? '#1e293b' : '#94a3b8',
-    borderBottom: active ? '2px solid #1e293b' : '2px solid #e2e8f0',
-    backgroundColor: 'transparent',
-    border: 'none',
-    borderBottomWidth: '2px',
-  });
-
-  const inputStyle = {
-    width: '100%',
-    padding: '10px 12px',
-    border: '1px solid #cbd5e1',
-    borderRadius: '6px',
-    fontSize: '14px',
-    boxSizing: 'border-box' as const,
-    backgroundColor: '#ffffff',
-    color: '#1e293b',
-  };
-
-  const labelStyle = {
-    display: 'block',
-    fontSize: '13px',
-    color: '#334155',
-    marginBottom: '6px',
   };
 
   return (
     <div
       style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
+        position: 'relative',
         minHeight: '100vh',
-        backgroundColor: '#f8fafc',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: theme.colors.pageBg,
+        padding: 24,
+        overflow: 'hidden',
       }}
     >
-      <div
-        style={{
-          width: '360px',
-          backgroundColor: '#ffffff',
-          borderRadius: '12px',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
-          padding: '40px 32px',
-        }}
-      >
-        <div style={{ marginBottom: '20px' }}>
-          <h2 style={{ margin: 0, color: '#1e293b', fontSize: '24px' }}>
-            Admin Panel
-          </h2>
-          <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: '14px' }}>
-            {mode === 'login' ? 'Sign in to manage your workspace' : 'Create a new account'}
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', marginBottom: '24px' }}>
-          <button type="button" onClick={() => setMode('login')} style={tabStyle(mode === 'login')}>
-            Sign In
-          </button>
-          <button type="button" onClick={() => setMode('signup')} style={tabStyle(mode === 'signup')}>
-            Create Account
-          </button>
-        </div>
-
-        {mode === 'login' ? (
-          <form onSubmit={handleSubmit}>
-            {error && (
-              <div
-                style={{
-                  backgroundColor: '#fee2e2',
-                  color: '#dc2626',
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  marginBottom: '16px',
-                }}
-              >
-                {error}
-              </div>
-            )}
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={labelStyle}>Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={{ marginBottom: '24px' }}>
-              <label style={labelStyle}>Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-
-            <button
-              type="submit"
-              style={{
-                width: '100%',
-                padding: '11px',
-                backgroundColor: '#1e293b',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              Sign in
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleSignup}>
-            {signupError && (
-              <div
-                style={{
-                  backgroundColor: '#fee2e2',
-                  color: '#dc2626',
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  marginBottom: '16px',
-                }}
-              >
-                {signupError}
-              </div>
-            )}
-            {signupSuccess && (
-              <div
-                style={{
-                  backgroundColor: '#dcfce7',
-                  color: '#16a34a',
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  marginBottom: '16px',
-                }}
-              >
-                {signupSuccess}
-              </div>
-            )}
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={labelStyle}>Name</label>
-              <input
-                type="text"
-                value={signupName}
-                onChange={(e) => setSignupName(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={labelStyle}>Email</label>
-              <input
-                type="email"
-                value={signupEmail}
-                onChange={(e) => setSignupEmail(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={{ marginBottom: '24px' }}>
-              <label style={labelStyle}>Password</label>
-              <input
-                type="password"
-                value={signupPassword}
-                onChange={(e) => setSignupPassword(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-
-            <button
-              type="submit"
-              style={{
-                width: '100%',
-                padding: '11px',
-                backgroundColor: '#1e293b',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              Create Account
-            </button>
-          </form>
-        )}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
+        <NetworkBackground />
       </div>
+
+      <Card style={{ width: 480, position: 'relative', zIndex: 1 }} styles={{ body: { padding: '48px 48px 40px' } }}>
+        {/* Logo / brand badge */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            marginBottom: 28,
+          }}
+        >
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 16,
+              background: `linear-gradient(135deg, ${theme.colors.sidebarBg}, #6366f1)`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 16,
+              boxShadow: '0 8px 20px rgba(79, 70, 229, 0.25)',
+            }}
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M12 2L3 7v6c0 5 4 8.5 9 9 5-.5 9-4 9-9V7l-9-5z"
+                stroke="#fff"
+                strokeWidth="1.6"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M9 12l2 2 4-4"
+                stroke="#fff"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+
+          <Link
+            to="/"
+            style={{
+              fontFamily: theme.font.heading,
+              fontWeight: 800,
+              fontSize: 22,
+              color: theme.colors.sidebarBg,
+              textDecoration: 'none',
+            }}
+          >
+            Admin Panel
+          </Link>
+          <span style={{ fontSize: 13, color: '#8c8c8c', marginTop: 4 }}>
+            Sign in to manage your workspace
+          </span>
+        </div>
+
+        <Tabs
+          activeKey={mode}
+          onChange={(key) => setMode(key as 'login' | 'signup')}
+          centered
+          items={[
+            {
+              key: 'login',
+              label: 'Sign In',
+              children: (
+                <Form layout="vertical" onFinish={handleLogin} style={{ marginTop: 24 }}>
+                  {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} showIcon />}
+                  {signupSuccess && (
+                    <Alert
+                      type="success"
+                      message="Account created! You can now sign in."
+                      style={{ marginBottom: 16 }}
+                      showIcon
+                    />
+                  )}
+                  <Form.Item
+                    label="Email"
+                    name="email"
+                    rules={[{ required: true, type: 'email', message: 'Enter a valid email' }]}
+                  >
+                    <Input size="large" placeholder="you@example.com" />
+                  </Form.Item>
+                  <Form.Item
+                    label="Password"
+                    name="password"
+                    rules={[{ required: true, message: 'Enter your password' }]}
+                  >
+                    <Input.Password size="large" placeholder="••••••••" />
+                  </Form.Item>
+                  <Button type="primary" htmlType="submit" block loading={submitting} size="large">
+                    Sign in
+                  </Button>
+                </Form>
+              ),
+            },
+            {
+              key: 'signup',
+              label: 'Create Account',
+              children: (
+                <Form layout="vertical" onFinish={handleSignup} style={{ marginTop: 24 }}>
+                  {signupError && (
+                    <Alert type="error" message={signupError} style={{ marginBottom: 16 }} showIcon />
+                  )}
+                  <Form.Item label="Name" name="name" rules={[{ required: true, message: 'Enter your name' }]}>
+                    <Input size="large" placeholder="Jane Doe" />
+                  </Form.Item>
+                  <Form.Item
+                    label="Email"
+                    name="email"
+                    rules={[{ required: true, type: 'email', message: 'Enter a valid email' }]}
+                  >
+                    <Input size="large" placeholder="you@example.com" />
+                  </Form.Item>
+                  <Form.Item
+                    label="Password"
+                    name="password"
+                    rules={[{ required: true, message: 'Choose a password' }]}
+                  >
+                    <Input.Password size="large" placeholder="••••••••" />
+                  </Form.Item>
+                  <Button type="primary" htmlType="submit" block loading={submitting} size="large">
+                    Create account
+                  </Button>
+                </Form>
+              ),
+            },
+          ]}
+        />
+      </Card>
     </div>
   );
 }

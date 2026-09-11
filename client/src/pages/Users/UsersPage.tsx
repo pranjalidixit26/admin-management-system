@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "antd";
 import UsersTable from "./UsersTable";
 import UserForm from "./UserForm";
 import { hasPermission } from "../../utils/permissions";
@@ -18,29 +19,41 @@ interface User {
 
 export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const handleSuccess = () => {
+  const openCreateForm = () => {
     setEditingUser(null);
+    setIsFormOpen(true);
+  };
+
+  const openEditForm = (user: User) => {
+    setEditingUser(user);
+    setIsFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setEditingUser(null);
+  };
+
+  const handleSuccess = () => {
+    closeForm();
     setRefreshKey((prev) => prev + 1);
   };
 
   return (
     <div>
-      <h1>Users</h1>
-      {(editingUser?hasPermission('USER_EDIT'):hasPermission('USER_CREATE'))&&(
-        <div style={{marginBottom:'30px'}}>
-          <h3>{editingUser?'Edit User':'Add New User'}</h3>
-          <UserForm
-            editingUser={editingUser}
-            onSuccess={handleSuccess}
-            onCancel={()=>setEditingUser(null)}
-          />
-        </div>
-      )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h1>Users</h1>
+        {hasPermission('USER_CREATE') && (
+          <Button type="primary" onClick={openCreateForm}>Add New User</Button>
+        )}
+      </div>
 
-      <h3>Existing Users</h3>
-      <UsersTable key={refreshKey} refreshKey={refreshKey} onEdit={setEditingUser} />
+      <UsersTable key={refreshKey} refreshKey={refreshKey} onEdit={openEditForm} />
+
+      <UserForm open={isFormOpen} editingUser={editingUser} onSuccess={handleSuccess} onCancel={closeForm} />
     </div>
   );
 }

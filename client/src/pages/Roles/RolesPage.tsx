@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "antd";
 import RoleForm from './RoleForm';
 import RolesTable from './RolesTable';
 import { hasPermission } from "../../utils/permissions";
@@ -9,33 +10,50 @@ interface Permission {
   name: string;
 }
 
-interface Role{
+interface Role {
   id: number;
   name: string;
   status: boolean;
   permissions?: Permission[];
 }
 
-export default function RolesPage(){
-  const [editingRole,setEditingRole] =useState<Role|null>(null);
-  const [refreshKey, setRefreshKey]=useState(0);
+export default function RolesPage() {
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const handleSuccess=()=>{
+  const openCreateForm = () => {
     setEditingRole(null);
-    setRefreshKey((prev)=> prev + 1);
+    setIsFormOpen(true);
   };
 
-  return(
+  const openEditForm = (role: Role) => {
+    setEditingRole(role);
+    setIsFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setEditingRole(null);
+  };
+
+  const handleSuccess = () => {
+    closeForm();
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  return (
     <div>
-      <h1>Roles</h1>
-      {(editingRole?hasPermission('ROLE_EDIT'):hasPermission('ROLE_CREATE'))&&(
-        <RoleForm
-          editingRole={editingRole}
-          onSuccess={handleSuccess}
-          onCancel={()=>setEditingRole(null)}
-        />
-      )}
-      <RolesTable onEdit={setEditingRole} refreshKey={refreshKey} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h1>Roles</h1>
+        {hasPermission('ROLE_CREATE') && (
+          <Button type="primary" onClick={openCreateForm}>Add New Role</Button>
+        )}
+      </div>
+
+      <RolesTable key={refreshKey} refreshKey={refreshKey} onEdit={openEditForm} />
+
+      <RoleForm open={isFormOpen} editingRole={editingRole} onSuccess={handleSuccess} onCancel={closeForm} />
     </div>
   );
 }

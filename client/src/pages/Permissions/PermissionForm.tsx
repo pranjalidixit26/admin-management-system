@@ -1,78 +1,89 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Modal, Form, Input, message } from "antd";
 import api from '../../api/axios';
-import Button from '../../components/Button';
 
 interface Permission {
-  id:number;
+  id: number;
   code: string;
-  name:string;
+  name: string;
 }
 
-interface PermissionFormProps{
-  editingPermission: Permission|null;
-  onSuccess: () =>void;
-  onCancel: ()=>void;
+interface PermissionFormProps {
+  open: boolean;
+  editingPermission: Permission | null;
+  onSuccess: () => void;
+  onCancel: () => void;
 }
 
-export default function PermissionForm({editingPermission,onSuccess,onCancel}:PermissionFormProps) {
-  const [code,setCode] =useState('');
-  const [name, setName]= useState('');
-  const [error,setError]= useState('');
+interface FormValues {
+  code: string;
+  name: string;
+}
 
-  useEffect(()=>{
-    if(editingPermission){
-      setCode(editingPermission.code);
-      setName(editingPermission.name);
-    }else {
-      setCode('');
-      setName('');
+export default function PermissionForm({ open, editingPermission, onSuccess, onCancel }: PermissionFormProps) {
+  const [form] = Form.useForm<FormValues>();
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    if (editingPermission) {
+      form.setFieldsValue({
+        code: editingPermission.code,
+        name: editingPermission.name,
+      });
+    } else {
+      form.resetFields();
     }
-  },[editingPermission]);
+  }, [open, editingPermission, form]);
 
-  const handleSubmit =async (e:React.FormEvent)=>{
-    e.preventDefault();
-    setError('');
-
-    try{
-      if(editingPermission){
-        await api.patch(`/permissions/${editingPermission.id}`,{code,name });
-      } else{
-        await api.post('/permissions', { code,name});
+  const handleFinish = async (values: FormValues) => {
+    setSubmitting(true);
+    try {
+      if (editingPermission) {
+        await api.patch(`/permissions/${editingPermission.id}`, values);
+        message.success('Permission updated successfully!');
+      } else {
+        await api.post('/permissions', values);
+        message.success('Permission created successfully!');
       }
-      setCode('');
-      setName('');
+      form.resetFields();
       onSuccess();
-    } catch(err){
-      console.error('Failed to save permission:',err);
-      setError('Failed to save permission. Please try again.');
+    } catch (err) {
+      console.error('Failed to save permission:', err);
+      message.error('Failed to save permission. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{marginBottom:'20px' }}>
-      <input
-        type="text"
-        placeholder="Code (e.g. USER_CREATE)"
-        value={code}
-        onChange={(e)=>setCode(e.target.value.toUpperCase())}
-        required
-        style={{marginRight:'8px',padding:'6px'}}
-      />
-      <input
-        type="text"
-        placeholder= "Name (e.g. Create User)"
-        value={name}
-        onChange={(e)=> setName(e.target.value)}
-        required
-        style={{marginRight:'8px',padding:'6px' }}
-      />
-      <Button type="submit">{editingPermission?'Update': 'Create'}</Button>
-      {editingPermission && (
-        <Button type="button" variant="secondary" onClick={onCancel} style={{ marginLeft: '8px' }}>
-          Cancel
-        </Button>
-      )}
-      {error &&<p style={{ color: 'red' }}>{error}</p>}
-    </form>
+    <Modal
+      title={editingPermission ? 'Edit Permission' : 'Add New Permission'}
+      open={open}
+      onCancel={onCancel}
+      onOk={() => form.submit()}
+      confirmLoading={submitting}
+      okText={editingPermission ? 'Update' : 'Create'}
+      destroyOnClose
+    >
+      <Form form={form} layout="vertical" onFinish={handleFinish}>
+        <Form.Item
+          label="Code"
+          name="code"
+          rules={[{ required: true, message: 'Please enter a code' }]}
+          normalize={(value: string) => value?.toUpperCase()}
+        >
+          <Input placeholder="e.g. USER_CREATE" />
+        </Form.Item>
+
+        <Form.Item
+          label="Name"
+          name="name"
+          rules={[{ required: true, message: 'Please enter a name' }]}
+        >
+          <Input placeholder="e.g. Create User" />
+        </Form.Item>
+      </Form>
+    </Modal>
   );
 }

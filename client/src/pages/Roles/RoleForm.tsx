@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Modal, Form, Input, Select, message } from "antd";
 import api from '../../api/axios';
-import Button from '../../components/Button';
 
 interface Permission {
   id: number;
@@ -8,38 +8,44 @@ interface Permission {
   name: string;
 }
 
-interface Role{
+interface Role {
   id: number;
   name: string;
   status: boolean;
   permissions?: Permission[];
 }
 
-interface RoleFormProps{
+interface RoleFormProps {
+  open: boolean;
   editingRole: Role | null;
-  onSuccess: ()=>void;
-  onCancel: () =>void;
+  onSuccess: () => void;
+  onCancel: () => void;
 }
 
-export default function RoleForm({ editingRole, onSuccess, onCancel }: RoleFormProps) {
-  const [name, setName]=useState('');
-  const [error, setError]= useState('');
+interface FormValues {
+  name: string;
+  permissionIds?: number[];
+}
 
+export default function RoleForm({ open, editingRole, onSuccess, onCancel }: RoleFormProps) {
+  const [form] = Form.useForm<FormValues>();
   const [allPermissions, setAllPermissions] = useState<Permission[]>([]);
-  const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>([]);
-
-  useEffect(()=>{
-    if (editingRole){
-      setName(editingRole.name);
-      setSelectedPermissionIds(editingRole.permissions?.map((p) => p.id) ?? []);
-    } else {
-      setName('');
-      setSelectedPermissionIds([]);
-    }
-  },[editingRole]);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!editingRole) return;
+    if (!open) return;
+    if (editingRole) {
+      form.setFieldsValue({
+        name: editingRole.name,
+        permissionIds: editingRole.permissions?.map((p) => p.id) ?? [],
+      });
+    } else {
+      form.resetFields();
+    }
+  }, [open, editingRole, form]);
+
+  useEffect(() => {
+    if (!editingRole || !open) return;
     const fetchPermissions = async () => {
       try {
         const response = await api.get('/permissions', { params: { limit: 100 } });
@@ -49,71 +55,57 @@ export default function RoleForm({ editingRole, onSuccess, onCancel }: RoleFormP
       }
     };
     fetchPermissions();
-  }, [editingRole]);
+  }, [editingRole, open]);
 
-  const handlePermissionToggle = (permissionId: number) => {
-    setSelectedPermissionIds((prev) =>
-      prev.includes(permissionId) ? prev.filter((id) => id !== permissionId) : [...prev, permissionId]
-    );
-  };
-
-  const handleSubmit = async (e: React.FormEvent) =>{
-    e.preventDefault();
-    setError('');
-
+  const handleFinish = async (values: FormValues) => {
+    setSubmitting(true);
     try {
-      if (editingRole){
-        await api.patch(`/roles/${editingRole.id}`, { name });
-        await api.patch(`/roles/${editingRole.id}/permissions`, { permissionIds: selectedPermissionIds });
-      }else {
-        await api.post('/roles', { name, status: true });
+      if (editingRole) {
+        await api.patch(`/roles/${editingRole.id}`, { name: values.name });
+        await api.patch(`/roles/${editingRole.id}/permissions`, {
+          permissionIds: values.permissionIds ?? [],
+        });
+        message.success('Role updated successfully!');
+      } else {
+        await api.post('/roles', { name: values.name, status: true });
+        message.success('Role created successfully!');
       }
-      setName('');
-      setSelectedPermissionIds([]);
+      form.resetFields();
       onSuccess();
     } catch (err) {
       console.error('Failed to save role:', err);
-      setError('Failed to save role. Please try again.');
+      message.error('Failed to save role. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  return(
-    <form onSubmit={handleSubmit} style={{marginBottom: '20px'}}>
-      <input
-        type="text"
-        placeholder="Role name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-        style={{marginRight:'8px',padding:'6px' }}
-      />
-      <Button type="submit">{editingRole?'Update':'Create'}</Button>
-        {editingRole &&(
-        <Button type="button" variant="secondary" onClick={onCancel} style={{marginLeft:'8px'}}>
-            Cancel
-        </Button>
+  return (
+    <Modal
+      title={editingRole ? 'Edit Role' : 'Add New Role'}
+      open={open}
+      onCancel={onCancel}
+      onOk={() => form.submit()}
+      confirmLoading={submitting}
+      okText={editingRole ? 'Update' : 'Create'}
+      destroyOnClose
+    >
+      <Form form={form} layout="vertical" onFinish={handleFinish}>
+        <Form.Item label="Role name" name="name" rules={[{ required: true, message: 'Please enter a role name' }]}>
+          <Input placeholder="Role name" />
+        </Form.Item>
+
+        {editingRole && (
+          <Form.Item label="Permissions" name="permissionIds">
+            <Select
+              mode="multiple"
+              placeholder="Select permissions"
+              loading={allPermissions.length === 0}
+              options={allPermissions.map((p) => ({ label: `${p.code} — ${p.name}`, value: p.id }))}
+            />
+          </Form.Item>
         )}
-
-      {editingRole && (
-        <div style={{ marginTop: '12px' }}>
-          <label>Permissions</label>
-          <br />
-          {allPermissions.length === 0 && <p style={{ color: '#999' }}>Loading permissions...</p>}
-          {allPermissions.map((permission) => (
-            <label key={permission.id} style={{ display: 'block', marginTop: '4px' }}>
-              <input
-                type="checkbox"
-                checked={selectedPermissionIds.includes(permission.id)}
-                onChange={() => handlePermissionToggle(permission.id)}
-                style={{ marginRight: '8px' }}
-              />
-              {permission.code} — {permission.name}
-            </label>
-          ))}
-        </div>
-      )}
-
-      {error&&<p style={{color:'red'}}>{error}</p>}
-    </form>
+      </Form>
+    </Modal>
   );
 }

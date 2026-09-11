@@ -16,6 +16,7 @@ export const theme = {
   spacing: (n: number) => `${n * 4}px`,
   radius: '6px',
   font: {
-    body: `-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`,
+    body: `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`,
+    heading: `'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`,
   },
 };

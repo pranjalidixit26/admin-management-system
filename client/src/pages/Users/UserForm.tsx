@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Modal, Form, Input, Select, message } from "antd";
 import axios from '../../api/axios';
-import Button from '../../components/Button';
 
 interface Role {
   id: number;
@@ -16,37 +16,40 @@ interface User {
 }
 
 interface UserFormProps {
+  open: boolean;
   editingUser: User | null;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export default function UserForm({ editingUser, onSuccess, onCancel }: UserFormProps) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+interface FormValues {
+  name: string;
+  email: string;
+  password?: string;
+  roleIds?: number[];
+}
 
+export default function UserForm({ open, editingUser, onSuccess, onCancel }: UserFormProps) {
+  const [form] = Form.useForm<FormValues>();
   const [allRoles, setAllRoles] = useState<Role[]>([]);
-  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    if (!open) return;
     if (editingUser) {
-      setName(editingUser.name);
-      setEmail(editingUser.email);
-      setPassword('');
-      setSelectedRoleIds(editingUser.roles?.map((r) => r.id) ?? []);
+      form.setFieldsValue({
+        name: editingUser.name,
+        email: editingUser.email,
+        password: '',
+        roleIds: editingUser.roles?.map((r) => r.id) ?? [],
+      });
     } else {
-      setName('');
-      setEmail('');
-      setPassword('');
-      setSelectedRoleIds([]);
+      form.resetFields();
     }
-  }, [editingUser]);
+  }, [open, editingUser, form]);
 
   useEffect(() => {
-    if (!editingUser) return;
+    if (!editingUser || !open) return;
     const fetchRoles = async () => {
       try {
         const response = await axios.get('/roles', { params: { limit: 100 } });
@@ -56,105 +59,83 @@ export default function UserForm({ editingUser, onSuccess, onCancel }: UserFormP
       }
     };
     fetchRoles();
-  }, [editingUser]);
+  }, [editingUser, open]);
 
-  const handleRoleToggle = (roleId: number) => {
-    setSelectedRoleIds((prev) =>
-      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]
-    );
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-
+  const handleFinish = async (values: FormValues) => {
+    setSubmitting(true);
     try {
       if (editingUser) {
-        const updateData: { name: string; email: string; password?: string } = { name, email };
-        if (password) {
-          updateData.password = password;
-        }
+        const updateData: { name: string; email: string; password?: string } = {
+          name: values.name,
+          email: values.email,
+        };
+        if (values.password) updateData.password = values.password;
         await axios.patch(`/users/${editingUser.id}`, updateData);
-        await axios.patch(`/users/${editingUser.id}/roles`, { roleIds: selectedRoleIds });
-        setSuccess('User updated successfully!');
+        await axios.patch(`/users/${editingUser.id}/roles`, { roleIds: values.roleIds ?? [] });
+        message.success('User updated successfully!');
       } else {
-        await axios.post('/users', { name, email, password });
-        setSuccess('User created successfully!');
+        await axios.post('/users', {
+          name: values.name,
+          email: values.email,
+          password: values.password,
+        });
+        message.success('User created successfully!');
       }
-      setName('');
-      setEmail('');
-      setPassword('');
-      setSelectedRoleIds([]);
+      form.resetFields();
       onSuccess();
     } catch (err) {
-      setError(editingUser ? 'Failed to update user.' : 'Failed to create user.');
+      console.error('Failed to save user:', err);
+      message.error(editingUser ? 'Failed to update user.' : 'Failed to create user.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ maxWidth: '400px' }}>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {success && <p style={{ color: 'green' }}>{success}</p>}
+    <Modal
+      title={editingUser ? 'Edit User' : 'Add New User'}
+      open={open}
+      onCancel={onCancel}
+      onOk={() => form.submit()}
+      confirmLoading={submitting}
+      okText={editingUser ? 'Update User' : 'Create User'}
+      destroyOnClose
+    >
+      <Form form={form} layout="vertical" onFinish={handleFinish}>
+        <Form.Item label="Name" name="name" rules={[{ required: true, message: 'Please enter a name' }]}>
+          <Input />
+        </Form.Item>
 
-      <div style={{ marginBottom: '12px' }}>
-        <label>Name</label>
-        <br />
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          style={{ width: '100%', padding: '8px' }}
-        />
-      </div>
+        <Form.Item
+          label="Email"
+          name="email"
+          rules={[
+            { required: true, message: 'Please enter an email' },
+            { type: 'email', message: 'Please enter a valid email' },
+          ]}
+        >
+          <Input />
+        </Form.Item>
 
-      <div style={{ marginBottom: '12px' }}>
-        <label>Email</label>
-        <br />
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ width: '100%', padding: '8px' }}
-        />
-      </div>
+        <Form.Item
+          label={editingUser ? 'Password (leave blank to keep unchanged)' : 'Password'}
+          name="password"
+          rules={editingUser ? [] : [{ required: true, message: 'Please enter a password' }]}
+        >
+          <Input.Password />
+        </Form.Item>
 
-      <div style={{ marginBottom: '12px' }}>
-        <label>Password {editingUser && '(leave blank to keep unchanged)'}</label>
-        <br />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ width: '100%', padding: '8px' }}
-        />
-      </div>
-
-      {editingUser && (
-        <div style={{ marginBottom: '12px' }}>
-          <label>Roles</label>
-          <br />
-          {allRoles.length === 0 && <p style={{ color: '#999' }}>Loading roles...</p>}
-          {allRoles.map((role) => (
-            <label key={role.id} style={{ display: 'block', marginTop: '4px' }}>
-              <input
-                type="checkbox"
-                checked={selectedRoleIds.includes(role.id)}
-                onChange={() => handleRoleToggle(role.id)}
-                style={{ marginRight: '8px' }}
-              />
-              {role.name}
-            </label>
-          ))}
-        </div>
-      )}
-
-      <Button type="submit">{editingUser ? 'Update User' : 'Create User'}</Button>
         {editingUser && (
-        <Button type="button" variant="secondary" onClick={onCancel} style={{ marginLeft: '8px' }}>
-            Cancel
-        </Button>
+          <Form.Item label="Roles" name="roleIds">
+            <Select
+              mode="multiple"
+              placeholder="Select roles"
+              loading={allRoles.length === 0}
+              options={allRoles.map((role) => ({ label: role.name, value: role.id }))}
+            />
+          </Form.Item>
         )}
-    </form>
+      </Form>
+    </Modal>
   );
 }
