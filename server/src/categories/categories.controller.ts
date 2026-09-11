@@ -41,6 +41,13 @@ export class CategoriesController {
     );
   }
 
+  // NOTE: this must come BEFORE @Get(':id'), otherwise "tree" gets
+  // captured as the :id param and this route is never reached.
+  @Get('tree')
+  findTree() {
+    return this.categoriesService.findTree();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.categoriesService.findOne(+id);

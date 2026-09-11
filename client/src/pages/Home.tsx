@@ -1,6 +1,15 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Avatar, Dropdown } from 'antd';
+import type { MenuProps } from 'antd';
 import './Home.css';
 import NetworkBackground from '../components/NetworkBackground';
+
+interface CustomerInfo {
+  id: number;
+  name: string;
+  email: string;
+}
 
 const features = [
   {
@@ -22,14 +31,80 @@ const features = [
 ];
 
 export default function Home() {
+  const [customer, setCustomer] = useState<CustomerInfo | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('customer');
+    if (stored) {
+      try {
+        setCustomer(JSON.parse(stored));
+      } catch {
+        setCustomer(null);
+      }
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('customer_access_token');
+    localStorage.removeItem('customer');
+    setCustomer(null);
+  };
+
+  const menuItems: MenuProps['items'] = [
+  {
+    key: 'info',
+    label: (
+        <div style={{ padding: '4px 0' }}>
+        <div style={{ fontWeight: 600, fontSize: 14, color: '#1f2937' }}>{customer?.name}</div>
+        <div style={{ fontSize: 12, color: '#6b7280' }}>{customer?.email}</div>
+        </div>
+    ),
+    },
+  {
+    type: 'divider',
+  },
+  {
+    key: 'logout',
+    label: 'Logout',
+    onClick: handleLogout,
+  },
+];
+
   return (
     <div className="home">
         <div className="home-bg">
             <NetworkBackground />
         </div>
       <nav className="home-nav">
-        <span className="home-logo">Admin Panel</span>
-        <Link to="/login" className="home-nav-login">Login</Link>
+        <span className="home-logo">
+        <svg
+            className="home-logo-icon"
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#4C6FFF"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+            <path d="M3 6h18" />
+            <path d="M16 10a4 4 0 0 1-8 0" />
+        </svg>
+        <span className="home-logo-text">ShopNest</span>
+        </span>
+        {customer ? (
+          <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={['click']}>
+            <div style={{ cursor: 'pointer' }}>
+                <Avatar size={32} style={{ backgroundColor: '#4f46e5' }}>
+                {customer.name?.[0]?.toUpperCase()}
+                </Avatar>
+            </div>
+            </Dropdown>
+        ) : (
+          <Link to="/customer-login" className="home-nav-login">Sign In</Link>
+        )}
       </nav>
 
       <main className="home-main">
@@ -40,7 +115,13 @@ export default function Home() {
               Manage users, roles, permissions, and your product catalog with
               fine-grained control over who can do what.
             </p>
-            <Link to="/login" className="home-hero-cta">Log in to your workspace</Link>
+            {customer ? (
+              <p style={{ fontSize: 18, fontWeight: 600, color: '#1f2937' }}>
+                Welcome back, {customer.name}!
+              </p>
+            ) : (
+              <Link to="/customer-login" className="home-hero-cta">Sign in to start shopping</Link>
+            )}
           </div>
 
           <div className="home-mockup">

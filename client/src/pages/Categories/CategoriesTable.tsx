@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Table, Input, Button, Space, Popconfirm, message, Tag, Tooltip, Empty } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import api from '../../api/axios';
@@ -9,6 +9,8 @@ interface Category {
   name: string;
   description: string | null;
   status: boolean;
+  parentId?: number | null;
+  subcategories?: Category[];
 }
 
 interface CategoriesTableProps {
@@ -21,17 +23,13 @@ export default function CategoriesTable({ refreshKey, onEdit }: CategoriesTableP
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const limit = 5;
 
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/categories', {
-        params: { page, limit, search },
-      });
-      setCategories(res.data.data);
-      setTotal(res.data.total);
+      const res = await api.get('/categories/tree');
+      setCategories(res.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -41,7 +39,7 @@ export default function CategoriesTable({ refreshKey, onEdit }: CategoriesTableP
 
   useEffect(() => {
     fetchCategories();
-  }, [refreshKey, page, search]);
+  }, [refreshKey]);
 
   const handleDelete = async (id: number) => {
     try {
@@ -53,6 +51,26 @@ export default function CategoriesTable({ refreshKey, onEdit }: CategoriesTableP
       message.error('Failed to delete category');
     }
   };
+
+  // A top-level category is kept if its own name matches the search, or if
+  // any of its subcategories match (in which case only matching subs show).
+  const filteredCategories = useMemo(() => {
+    if (!search.trim()) return categories;
+    const q = search.toLowerCase();
+
+    return categories
+      .map((cat) => {
+        const selfMatches = cat.name.toLowerCase().includes(q);
+        const matchingSubs = (cat.subcategories || []).filter((sub) =>
+          sub.name.toLowerCase().includes(q),
+        );
+
+        if (selfMatches) return cat;
+        if (matchingSubs.length > 0) return { ...cat, subcategories: matchingSubs };
+        return null;
+      })
+      .filter((cat): cat is Category => cat !== null);
+  }, [categories, search]);
 
   const showActions = hasPermission('CATEGORY_EDIT') || hasPermission('CATEGORY_DELETE');
 
@@ -121,18 +139,28 @@ export default function CategoriesTable({ refreshKey, onEdit }: CategoriesTableP
           setSearch(value);
           setPage(1);
         }}
+        onChange={(e) => {
+          if (!e.target.value) {
+            setSearch('');
+            setPage(1);
+          }
+        }}
         style={{ marginBottom: 16, maxWidth: 300 }}
         allowClear
       />
       <Table
         rowKey="id"
         columns={columns}
-        dataSource={categories}
+        dataSource={filteredCategories}
         loading={loading}
+        expandable={{
+          childrenColumnName: 'subcategories',
+          rowExpandable: (record) => !!record.subcategories && record.subcategories.length > 0,
+        }}
         pagination={{
           current: page,
           pageSize: limit,
-          total,
+          total: filteredCategories.length,
           onChange: (p) => setPage(p),
         }}
         locale={{

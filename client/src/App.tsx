@@ -10,6 +10,7 @@ import PermissionsPage from './pages/Permissions/PermissionsPage';
 import GuestRoute from './components/GuestRoute';
 import CategoriesPage from './pages/Categories/CategoriesPage';
 import ProductsPage from './pages/Products/ProductsPage';
+import CustomerLogin from './pages/CustomerLogin';
 
 function App() {
   return (
@@ -20,6 +21,8 @@ function App() {
         <Route element={<GuestRoute />}>
           <Route path="/login" element={<Login />} />
         </Route>
+
+        <Route path="/customer-login" element={<CustomerLogin />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>

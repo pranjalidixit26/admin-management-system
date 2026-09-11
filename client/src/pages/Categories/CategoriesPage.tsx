@@ -12,6 +12,8 @@ interface Category {
   name: string;
   description: string | null;
   status: boolean;
+  parentId?: number | null;
+  subcategories?: Category[];
 }
 
 export default function CategoriesPage() {

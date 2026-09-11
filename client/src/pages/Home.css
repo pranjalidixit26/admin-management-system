@@ -305,3 +305,37 @@
   position: relative;
   z-index: 1;
 }
+
+.home-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-logo-icon {
+  transition: transform 0.3s ease;
+}
+
+.home-logo:hover .home-logo-icon {
+  animation: logo-bounce 0.6s ease;
+}
+
+@keyframes logo-bounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-4px) rotate(-8deg); }
+  60% { transform: translateY(0) rotate(6deg); }
+}
+
+.home-logo-text {
+  background: linear-gradient(90deg, #1a1f36, #4C6FFF, #8b5cf6, #4C6FFF, #1a1f36);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 3s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}

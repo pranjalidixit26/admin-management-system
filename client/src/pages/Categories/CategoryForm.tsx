@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Modal, Form, Input, Switch } from 'antd';
+import { useEffect, useState } from 'react';
+import { Modal, Form, Input, Switch, Select, message } from 'antd';
 import api from '../../api/axios';
 
 interface Category {
@@ -7,6 +7,8 @@ interface Category {
   name: string;
   description: string | null;
   status: boolean;
+  parentId?: number | null;
+  subcategories?: Category[];
 }
 
 interface CategoryFormProps {
@@ -18,6 +20,30 @@ interface CategoryFormProps {
 
 export default function CategoryForm({ open, editingCategory, onSuccess, onCancel }: CategoryFormProps) {
   const [form] = Form.useForm();
+  const [parentOptions, setParentOptions] = useState<Category[]>([]);
+  const [loadingParents, setLoadingParents] = useState(false);
+
+  const hasSubcategories = !!(editingCategory?.subcategories && editingCategory.subcategories.length > 0);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const fetchParentOptions = async () => {
+      setLoadingParents(true);
+      try {
+        const res = await api.get('/categories/tree');
+        const topLevel: Category[] = res.data;
+        // A category can't be its own parent
+        setParentOptions(topLevel.filter((c) => c.id !== editingCategory?.id));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingParents(false);
+      }
+    };
+
+    fetchParentOptions();
+  }, [open, editingCategory]);
 
   useEffect(() => {
     if (editingCategory) {
@@ -30,15 +56,23 @@ export default function CategoryForm({ open, editingCategory, onSuccess, onCance
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
+      // Explicitly send null (not omit the key) so clearing the parent
+      // on an existing subcategory actually turns it back into top-level.
+      const payload = { ...values, parentId: values.parentId ?? null };
+
       if (editingCategory) {
-        await api.patch(`/categories/${editingCategory.id}`, values);
+        await api.patch(`/categories/${editingCategory.id}`, payload);
       } else {
-        await api.post('/categories', values);
+        await api.post('/categories', payload);
       }
       form.resetFields();
       onSuccess();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      if (err?.response?.data?.message) {
+        message.error(err.response.data.message);
+      } else {
+        console.error(err);
+      }
     }
   };
 
@@ -59,6 +93,23 @@ export default function CategoryForm({ open, editingCategory, onSuccess, onCance
         </Form.Item>
         <Form.Item name="description" label="Description">
           <Input.TextArea />
+        </Form.Item>
+        <Form.Item
+          name="parentId"
+          label="Parent Category"
+          extra={
+            hasSubcategories
+              ? 'This category has subcategories, so it cannot be made a subcategory itself.'
+              : 'Leave empty to create a top-level category.'
+          }
+        >
+          <Select
+            allowClear
+            placeholder="None (top-level category)"
+            loading={loadingParents}
+            disabled={hasSubcategories}
+            options={parentOptions.map((c) => ({ label: c.name, value: c.id }))}
+          />
         </Form.Item>
         {editingCategory && (
           <Form.Item name="status" label="Active" valuePropName="checked">

@@ -1,15 +1,19 @@
-import { IsString, IsOptional, IsBoolean, IsNotEmpty } from "class-validator";
+import { IsString, IsOptional, IsBoolean, IsNotEmpty, IsInt } from "class-validator";
 
-export class CreateCategoryDto{
+export class CreateCategoryDto {
     @IsString()
     @IsNotEmpty()
-    name:string;
+    name: string;
 
     @IsOptional()
     @IsString()
-    description?:string;
+    description?: string;
 
     @IsOptional()
     @IsBoolean()
-    status?:boolean;
+    status?: boolean;
+
+    @IsOptional()
+    @IsInt()
+    parentId?: number;
 }

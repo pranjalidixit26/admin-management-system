@@ -5,6 +5,8 @@ import api from '../../api/axios';
 interface Category {
   id: number;
   name: string;
+  parentId?: number | null;
+  subcategories?: Category[];
 }
 
 interface Product {
@@ -28,12 +30,16 @@ interface ProductFormProps {
 export default function ProductForm({ open, editingProduct, onSuccess, onCancel }: ProductFormProps) {
   const [form] = Form.useForm();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
 
   useEffect(() => {
     if (open) {
-      api.get('/categories', { params: { limit: 100 } }).then((res) => {
-        setCategories(res.data.data);
-      });
+      setLoadingCategories(true);
+      api
+        .get('/categories/tree')
+        .then((res) => setCategories(res.data))
+        .catch((err) => console.error(err))
+        .finally(() => setLoadingCategories(false));
     }
   }, [open]);
 
@@ -47,6 +53,23 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
       form.resetFields();
     }
   }, [editingProduct, form]);
+
+  // Categories with subcategories render as a group (parent as header, plus a
+  // "general" option to assign the parent itself, then each subcategory).
+  // Categories with no subcategories render as a single flat, selectable option.
+  const categoryOptions = categories.map((cat) => {
+    if (cat.subcategories && cat.subcategories.length > 0) {
+      return {
+        label: cat.name,
+        title: cat.name,
+        options: [
+          { label: `${cat.name} (general)`, value: cat.id },
+          ...cat.subcategories.map((sub) => ({ label: sub.name, value: sub.id })),
+        ],
+      };
+    }
+    return { label: cat.name, value: cat.id };
+  });
 
   const handleOk = async () => {
     try {
@@ -92,8 +115,11 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
         </Form.Item>
         <Form.Item name="categoryId" label="Category" rules={[{ required: true, message: 'Please select a category' }]}>
           <Select
-            options={categories.map((c) => ({ value: c.id, label: c.name }))}
+            options={categoryOptions}
+            loading={loadingCategories}
             placeholder="Select a category"
+            showSearch
+            optionFilterProp="label"
           />
         </Form.Item>
         {editingProduct && (
