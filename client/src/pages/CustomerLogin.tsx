@@ -4,6 +4,7 @@ import { Card, Tabs, Form, Input, Button, Alert } from 'antd';
 import axios from 'axios';
 import { theme } from '../theme';
 import NetworkBackground from '../components/NetworkBackground';
+import { useCart } from '../context/CartContext';
 
 interface LoginValues {
   email: string;
@@ -18,6 +19,7 @@ interface SignupValues {
 }
 
 export default function CustomerLogin() {
+  const { refreshCart } = useCart();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [error, setError] = useState('');
   const [signupError, setSignupError] = useState('');
@@ -32,6 +34,7 @@ export default function CustomerLogin() {
       const response = await axios.post('http://localhost:3000/customer-auth/login', values);
       localStorage.setItem('customer_access_token', response.data.access_token);
       localStorage.setItem('customer', JSON.stringify(response.data.customer));
+      await refreshCart();
       navigate('/');
     } catch {
       setError('Invalid email or password');

@@ -6,8 +6,10 @@ import {
     UpdateDateColumn,
     ManyToOne,
     JoinColumn,
+    OneToMany,
 } from 'typeorm';
 import { Category } from '../../categories/entities/category.entity';
+import { ProductVariant } from './product-variant.entity';
 
 @Entity('products')
 export class Product{
@@ -42,6 +44,9 @@ export class Product{
 
     @Column({default:true})
     status:boolean;
+
+    @OneToMany(() => ProductVariant, (variant) => variant.product)
+    variants: ProductVariant[];
 
     @CreateDateColumn()
     created_at:Date;

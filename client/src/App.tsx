@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { CartProvider } from './context/CartContext';
 import AppLayout from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import UsersPage from './pages/Users/UsersPage';
@@ -11,10 +12,12 @@ import GuestRoute from './components/GuestRoute';
 import CategoriesPage from './pages/Categories/CategoriesPage';
 import ProductsPage from './pages/Products/ProductsPage';
 import CustomerLogin from './pages/CustomerLogin';
+import Cart from './pages/Cart';
 
 function App() {
-  return (
+    return (
     <BrowserRouter>
+      <CartProvider>
       <Routes>
         <Route path="/" element={<Home />} />
 
@@ -23,6 +26,7 @@ function App() {
         </Route>
 
         <Route path="/customer-login" element={<CustomerLogin />} />
+        <Route path="/cart" element={<Cart />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
@@ -34,7 +38,8 @@ function App() {
             <Route path="products" element={<ProductsPage />} />
           </Route>
         </Route>
-      </Routes>
+        </Routes>
+      </CartProvider>
     </BrowserRouter>
   );
 }

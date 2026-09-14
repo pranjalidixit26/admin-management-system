@@ -6,11 +6,12 @@ import { CustomersModule } from '../customers/customers.module';
 import { CustomerAuthService } from './customer-auth.service';
 import { CustomerAuthController } from './customer-auth.controller';
 import { CustomerJwtStrategy } from './customer-jwt.strategy';
+import { CustomerJwtAuthGuard } from './customer-jwt-auth.guard';
 
 @Module({
   imports: [
     CustomersModule,
-    PassportModule,
+    PassportModule.register({ defaultStrategy: 'jwt-customer' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -21,7 +22,7 @@ import { CustomerJwtStrategy } from './customer-jwt.strategy';
     }),
   ],
   controllers: [CustomerAuthController],
-  providers: [CustomerAuthService, CustomerJwtStrategy],
-  exports: [CustomerJwtStrategy, PassportModule],
+  providers: [CustomerAuthService, CustomerJwtStrategy, CustomerJwtAuthGuard], // <-- add guard here
+  exports: [CustomerJwtStrategy, PassportModule, CustomerJwtAuthGuard], // <-- and here
 })
 export class CustomerAuthModule {}

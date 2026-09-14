@@ -515,8 +515,14 @@
   margin: 0 auto;
   padding: 40px 48px 24px;
   display: grid;
-  grid-template-columns: 1.5fr 1fr;
+  grid-template-columns: 1.3fr 1fr 1fr;
   gap: 32px;
+}
+
+@media (max-width: 860px) {
+  .home-footer-content {
+    grid-template-columns: 1fr;
+  }
 }
 
 .home-footer-brand {

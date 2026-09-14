@@ -5,8 +5,11 @@ import {
     IsNumber,
     Min,
     IsBoolean,
-    isNumber,
+    IsArray,
+    ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { VariantDto } from './variant.dto';
 
 export class CreateProductDto{
     @IsString()
@@ -37,4 +40,10 @@ export class CreateProductDto{
     @IsBoolean()
     @IsOptional()
     status?:boolean;
+
+    @IsArray()
+    @IsOptional()
+    @ValidateNested({ each: true })
+    @Type(() => VariantDto)
+    variants?: VariantDto[];
 }

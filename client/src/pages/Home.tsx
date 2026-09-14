@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Avatar, Dropdown, Input, Spin, Empty } from 'antd';
+import { Link, useNavigate } from 'react-router-dom';
+import { Avatar, Dropdown, Input, Spin, Empty, Modal, Tag, message } from 'antd';
 import type { MenuProps } from 'antd';
 import axios from 'axios';
 import './Home.css';
 import NetworkBackground from '../components/NetworkBackground';
+import { useCart } from '../context/CartContext';
 
 interface CustomerInfo {
   id: number;
@@ -35,9 +36,27 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-    const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<number>>(new Set());
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedQty, setSelectedQty] = useState<number>(1);
+    const { addToCart, totalItems } = useCart();
+  const navigate = useNavigate();
+
+  const handleAddToCart = async (productId: number, qty: number) => {
+    if (!customer) {
+      message.warning('Please login to add items to your cart');
+      navigate('/customer-login');
+      return;
+    }
+    try {
+      await addToCart(productId, qty);
+      message.success('Item has been added to your cart');
+    } catch {
+      message.error('Could not add item — please try again');
+    }
+  };
 
   useEffect(() => {
     axios
@@ -131,6 +150,35 @@ export default function Home() {
           </svg>
           <span className="home-logo-text">ShopNest</span>
         </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        <Link to="/cart" style={{ position: 'relative', cursor: 'pointer', display: 'flex' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="9" cy="21" r="1" />
+            <circle cx="20" cy="21" r="1" />
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+          </svg>
+          {totalItems > 0 && (
+            <span
+              style={{
+                position: 'absolute',
+                top: -8,
+                right: -8,
+                background: '#4C6FFF',
+                color: '#fff',
+                borderRadius: '50%',
+                width: 18,
+                height: 18,
+                fontSize: 11,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 600,
+              }}
+            >
+            {totalItems}
+            </span>
+          )}
+        </Link>
         {customer ? (
           <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={['click']}>
             <div style={{ cursor: 'pointer' }}>
@@ -139,9 +187,10 @@ export default function Home() {
               </Avatar>
             </div>
           </Dropdown>
-        ) : (
+                ) : (
           <Link to="/customer-login" className="home-nav-login">Sign In</Link>
         )}
+        </div>
       </nav>
 
       <main className="home-main">
@@ -224,7 +273,15 @@ export default function Home() {
               <Empty description="No products found" style={{ margin: '48px auto' }} />
             ) : (
               products.map((p) => (
-                <div className="home-product-card" key={p.id}>
+                <div
+                  className="home-product-card"
+                  key={p.id}
+                  onClick={() => {
+                    setSelectedProduct(p);
+                    setSelectedQty(1);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
                   <div className="home-product-image">
                     {p.imageUrl ? (
                       <img src={p.imageUrl} alt={p.name} />
@@ -237,7 +294,16 @@ export default function Home() {
                     <h4 className="home-product-name">{p.name}</h4>
                     <div className="home-product-bottom">
                       <span className="home-product-price">₹{p.price}</span>
-                      <button className="home-add-to-cart">Add to Cart</button>
+                        <button
+                            className="home-add-to-cart"
+                            onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddToCart(p.id, 1);
+                            }}
+                            disabled={p.stock === 0}
+                        >
+                            Add to Cart
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -249,34 +315,149 @@ export default function Home() {
       </main>
 
       <footer className="home-footer-full">
-        <div className="home-footer-content">
-          <div className="home-footer-col">
-            <span className="home-footer-brand">ShopNest</span>
-            <p className="home-footer-tagline">
-              Everything you need, all in one place.
-            </p>
-          </div>
-          <div className="home-footer-col">
-            <h5>Shop by Category</h5>
-                        {flatCategories.length === 0 ? (
-              <span className="home-footer-muted">No categories yet</span>
-            ) : (
-              flatCategories.map((c) => (
-                <button
-                  key={c.id}
-                  className="home-footer-link"
-                  onClick={() => setSelectedCategoryId(c.id)}
+  <div className="home-footer-content">
+    <div className="home-footer-col">
+      <span className="home-footer-brand">ShopNest</span>
+      <p className="home-footer-tagline">
+        Everything you need, all in one place.
+      </p>
+    </div>
+    <div className="home-footer-col">
+      <h5>Quick Links</h5>
+      <Link to="/" className="home-footer-link" style={{ display: 'block' }}>Home</Link>
+      <Link to="/cart" className="home-footer-link" style={{ display: 'block' }}>Cart</Link>
+      {customer ? (
+        <button className="home-footer-link" onClick={handleLogout}>Logout</button>
+      ) : (
+        <Link to="/customer-login" className="home-footer-link" style={{ display: 'block' }}>Sign In</Link>
+      )}
+    </div>
+    <div className="home-footer-col">
+      <h5>Shop by Category</h5>
+      {categoryTree.length === 0 ? (
+        <span className="home-footer-muted">No categories yet</span>
+      ) : (
+        categoryTree.map((c) => (
+          <button
+            key={c.id}
+            className="home-footer-link"
+            onClick={() => setSelectedCategoryId(c.id)}
+          >
+            {c.name}
+          </button>
+        ))
+      )}
+    </div>
+  </div>
+  <div className="home-footer-bottom">
+    © {new Date().getFullYear()} ShopNest
+  </div>
+</footer>
+
+      <Modal
+        open={selectedProduct !== null}
+        onCancel={() => setSelectedProduct(null)}
+        footer={null}
+        width={640}
+        centered
+      >
+        {selectedProduct && (
+          <div style={{ display: 'flex', gap: 24, paddingTop: 8 }}>
+            <div
+              style={{
+                width: 220,
+                height: 220,
+                flexShrink: 0,
+                borderRadius: 8,
+                overflow: 'hidden',
+                background: '#f5f5f5',
+              }}
+            >
+              {selectedProduct.imageUrl ? (
+                <img
+                  src={selectedProduct.imageUrl}
+                  alt={selectedProduct.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : null}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              {selectedProduct.category && (
+                <span style={{ fontSize: 12, color: '#4C6FFF', fontWeight: 600, textTransform: 'uppercase' }}>
+                  {selectedProduct.category.name}
+                </span>
+              )}
+              <h2 style={{ margin: '6px 0', fontSize: 22 }}>{selectedProduct.name}</h2>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#1f2937', marginBottom: 8 }}>
+                ₹{selectedProduct.price}
+              </div>
+                            <Tag color={selectedProduct.stock > 0 ? 'green' : 'red'} style={{ width: 'fit-content', marginBottom: 12 }}>
+                {selectedProduct.stock > 0 ? `In Stock (${selectedProduct.stock})` : 'Out of Stock'}
+              </Tag>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <span style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>Quantity:</span>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 6,
+                    overflow: 'hidden',
+                  }}
                 >
-                  {c.name}
-                </button>
-              ))
-            )}
+                  <button
+                    onClick={() => setSelectedQty((q) => Math.max(1, q - 1))}
+                    disabled={selectedProduct.stock === 0}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      border: 'none',
+                      background: '#f3f4f6',
+                      fontSize: 16,
+                      cursor: selectedProduct.stock === 0 ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    −
+                  </button>
+                  <span style={{ width: 36, textAlign: 'center', fontSize: 14, fontWeight: 500 }}>
+                    {selectedQty}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setSelectedQty((q) => Math.min(selectedProduct.stock || 1, q + 1))
+                    }
+                    disabled={selectedProduct.stock === 0}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      border: 'none',
+                      background: '#f3f4f6',
+                      fontSize: 16,
+                      cursor: selectedProduct.stock === 0 ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <p style={{ color: '#6b7280', fontSize: 14, lineHeight: 1.6, flex: 1 }}>
+                {selectedProduct.description || 'No description available.'}
+              </p>
+                <button
+                    className="home-add-to-cart"
+                    style={{ alignSelf: 'flex-start', marginTop: 12 }}
+                    disabled={selectedProduct.stock === 0}
+                    onClick={() => {
+                    handleAddToCart(selectedProduct.id, selectedQty);
+                    setSelectedProduct(null);
+                    }}
+                >
+                    Add to Cart
+              </button>
+            </div>
           </div>
-        </div>
-        <div className="home-footer-bottom">
-          © {new Date().getFullYear()} ShopNest
-        </div>
-      </footer>
+        )}
+      </Modal>
     </div>
   );
 }

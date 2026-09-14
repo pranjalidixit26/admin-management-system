@@ -11,6 +11,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { ProductsModule } from './products/products.module';
 import { CustomersModule } from './customers/customers.module';
 import { CustomerAuthModule } from './customer-auth/customer-auth.module';
+import { CartModule } from './cart/cart.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { CustomerAuthModule } from './customer-auth/customer-auth.module';
     ProductsModule,
     CustomersModule,
     CustomerAuthModule,
+    CartModule,
   ],
   controllers: [AppController],
   providers: [AppService],
