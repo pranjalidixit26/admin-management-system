@@ -37,7 +37,15 @@ export class ProductVariant {
   @Column({ type: 'int', default: 0 })
   stock: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: {
+      to: (value: number | null) => value,
+      from: (value: string | null) => (value === null ? null : parseFloat(value)),
+    },
+  })
   price: number | null;
 
   @OneToMany(() => ProductVariantImage, (image) => image.variant)

@@ -3,6 +3,7 @@ import { Input, Popconfirm, message, Tag, Typography, Row, Col, Card, Empty, Spi
 import { EditOutlined, DeleteOutlined, PictureOutlined } from '@ant-design/icons';
 import api from '../../api/axios';
 import { hasPermission } from '../../utils/permissions';
+import ProductDetailsModal from './ProductDetailsModal';
 
 const { Text, Paragraph } = Typography;
 
@@ -37,6 +38,11 @@ export default function ProductsTable({ refreshKey, onEdit }: ProductsTableProps
   const [total, setTotal] = useState(0);
   const limit = 8;
 
+  // --- Details modal state ---
+  const [detailsVisible, setDetailsVisible] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -67,6 +73,20 @@ export default function ProductsTable({ refreshKey, onEdit }: ProductsTableProps
     }
   };
 
+  const handleCardClick = async (productId: number) => {
+    setDetailsVisible(true);
+    setDetailsLoading(true);
+    try {
+      const res = await api.get(`/products/${productId}`);
+      setSelectedProduct(res.data);
+    } catch (err) {
+      console.error(err);
+      message.error('Failed to load product details');
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
   const showActions = hasPermission('PRODUCT_EDIT') || hasPermission('PRODUCT_DELETE');
 
   return (
@@ -94,10 +114,12 @@ export default function ProductsTable({ refreshKey, onEdit }: ProductsTableProps
               <Col xs={24} sm={12} md={8} lg={6} key={product.id}>
                 <Card
                   hoverable
+                  onClick={() => handleCardClick(product.id)}
                   style={{
                     borderRadius: 14,
                     overflow: 'hidden',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                    cursor: 'pointer',
                   }}
                   styles={{ body: { padding: 16 } }}
                   cover={
@@ -138,7 +160,16 @@ export default function ProductsTable({ refreshKey, onEdit }: ProductsTableProps
                         >
                           {hasPermission('PRODUCT_EDIT') && (
                             <button
-                              onClick={() => onEdit(product)}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  const res = await api.get(`/products/${product.id}`);
+                                  onEdit(res.data);
+                                } catch (err) {
+                                  console.error(err);
+                                  message.error('Failed to load product details');
+                                }
+                              }}
                               style={overlayButtonStyle}
                               aria-label="Edit product"
                             >
@@ -155,6 +186,7 @@ export default function ProductsTable({ refreshKey, onEdit }: ProductsTableProps
                               onConfirm={() => handleDelete(product.id)}
                             >
                               <button
+                                onClick={(e) => e.stopPropagation()}
                                 style={{ ...overlayButtonStyle, color: '#ff4d4f' }}
                                 aria-label="Delete product"
                               >
@@ -239,6 +271,16 @@ export default function ProductsTable({ refreshKey, onEdit }: ProductsTableProps
           ))}
         </div>
       )}
+
+      <ProductDetailsModal
+        visible={detailsVisible}
+        loading={detailsLoading}
+        product={selectedProduct}
+        onClose={() => {
+          setDetailsVisible(false);
+          setSelectedProduct(null);
+        }}
+      />
 
       <style>{`
         .ant-card:hover .product-card-overlay {
