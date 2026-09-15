@@ -20,6 +20,17 @@ interface CategoryTreeNode {
   subcategories: CategoryTreeNode[];
 }
 
+interface ProductVariant {
+  id: number;
+  sku: string;
+  productId: number;
+  color: string | null;
+  size: string | null;
+  stock: number;
+  price: number | null;
+  images: { id: number; imageUrl: string }[];
+}
+
 interface Product {
   id: number;
   name: string;
@@ -29,6 +40,13 @@ interface Product {
   imageUrl: string | null;
   category: { id: number; name: string } | null;
   status: boolean;
+  variants: ProductVariant[];
+}
+
+// Builds a readable label for a variant chip, e.g. "Red / M", "Red", "M", or "Standard"
+function variantLabel(v: ProductVariant): string {
+  const parts = [v.color, v.size].filter(Boolean);
+  return parts.length > 0 ? parts.join(' / ') : 'Standard';
 }
 
 export default function Home() {
@@ -40,18 +58,19 @@ export default function Home() {
   const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<number>>(new Set());
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [selectedQty, setSelectedQty] = useState<number>(1);
     const { addToCart, totalItems } = useCart();
   const navigate = useNavigate();
 
-  const handleAddToCart = async (productId: number, qty: number) => {
+  const handleAddToCart = async (variantId: number, qty: number) => {
     if (!customer) {
       message.warning('Please login to add items to your cart');
       navigate('/customer-login');
       return;
     }
     try {
-      await addToCart(productId, qty);
+      await addToCart(variantId, qty);
       message.success('Item has been added to your cart');
     } catch {
       message.error('Could not add item — please try again');
@@ -102,6 +121,12 @@ export default function Home() {
     localStorage.removeItem('customer_access_token');
     localStorage.removeItem('customer');
     setCustomer(null);
+  };
+
+  const openProductModal = (p: Product) => {
+    setSelectedProduct(p);
+    setSelectedVariant(p.variants?.[0] ?? null);
+    setSelectedQty(1);
   };
 
   const menuItems: MenuProps['items'] = [
@@ -272,14 +297,14 @@ export default function Home() {
             ) : products.length === 0 ? (
               <Empty description="No products found" style={{ margin: '48px auto' }} />
             ) : (
-              products.map((p) => (
+              products.map((p) => {
+                const hasMultipleVariants = (p.variants?.length ?? 0) > 1;
+                const singleVariant = p.variants?.length === 1 ? p.variants[0] : null;
+                return (
                 <div
                   className="home-product-card"
                   key={p.id}
-                  onClick={() => {
-                    setSelectedProduct(p);
-                    setSelectedQty(1);
-                  }}
+                  onClick={() => openProductModal(p)}
                   style={{ cursor: 'pointer' }}
                 >
                   <div className="home-product-image">
@@ -294,20 +319,33 @@ export default function Home() {
                     <h4 className="home-product-name">{p.name}</h4>
                     <div className="home-product-bottom">
                       <span className="home-product-price">₹{p.price}</span>
-                        <button
+                        {hasMultipleVariants ? (
+                          <button
+                            className="home-add-to-cart"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openProductModal(p);
+                            }}
+                          >
+                            Select Options
+                          </button>
+                        ) : (
+                          <button
                             className="home-add-to-cart"
                             onClick={(e) => {
                             e.stopPropagation();
-                            handleAddToCart(p.id, 1);
+                            if (singleVariant) handleAddToCart(singleVariant.id, 1);
                             }}
-                            disabled={p.stock === 0}
+                            disabled={!singleVariant || singleVariant.stock === 0}
                         >
                             Add to Cart
                       </button>
+                        )}
                     </div>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
             </div>
           </div>
@@ -389,10 +427,49 @@ export default function Home() {
               )}
               <h2 style={{ margin: '6px 0', fontSize: 22 }}>{selectedProduct.name}</h2>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#1f2937', marginBottom: 8 }}>
-                ₹{selectedProduct.price}
+                ₹{selectedVariant?.price ?? selectedProduct.price}
               </div>
-                            <Tag color={selectedProduct.stock > 0 ? 'green' : 'red'} style={{ width: 'fit-content', marginBottom: 12 }}>
-                {selectedProduct.stock > 0 ? `In Stock (${selectedProduct.stock})` : 'Out of Stock'}
+
+              {(selectedProduct.variants?.length ?? 0) > 1 && (
+                <div style={{ marginBottom: 12 }}>
+                  <span style={{ fontSize: 13, color: '#374151', fontWeight: 500, display: 'block', marginBottom: 6 }}>
+                    Options:
+                  </span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {selectedProduct.variants.map((v) => (
+                      <button
+                        key={v.id}
+                        onClick={() => {
+                          setSelectedVariant(v);
+                          setSelectedQty(1);
+                        }}
+                        disabled={v.stock === 0}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: 20,
+                          border: selectedVariant?.id === v.id ? '2px solid #4C6FFF' : '1px solid #d1d5db',
+                          background: selectedVariant?.id === v.id ? '#eef2ff' : '#fff',
+                          color: v.stock === 0 ? '#9ca3af' : '#1f2937',
+                          fontSize: 13,
+                          fontWeight: 500,
+                          cursor: v.stock === 0 ? 'not-allowed' : 'pointer',
+                          textDecoration: v.stock === 0 ? 'line-through' : 'none',
+                        }}
+                      >
+                        {variantLabel(v)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <Tag
+                color={(selectedVariant?.stock ?? 0) > 0 ? 'green' : 'red'}
+                style={{ width: 'fit-content', marginBottom: 12 }}
+              >
+                {(selectedVariant?.stock ?? 0) > 0
+                  ? `In Stock (${selectedVariant?.stock})`
+                  : 'Out of Stock'}
               </Tag>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                 <span style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>Quantity:</span>
@@ -407,14 +484,14 @@ export default function Home() {
                 >
                   <button
                     onClick={() => setSelectedQty((q) => Math.max(1, q - 1))}
-                    disabled={selectedProduct.stock === 0}
+                    disabled={!selectedVariant || selectedVariant.stock === 0}
                     style={{
                       width: 32,
                       height: 32,
                       border: 'none',
                       background: '#f3f4f6',
                       fontSize: 16,
-                      cursor: selectedProduct.stock === 0 ? 'not-allowed' : 'pointer',
+                      cursor: !selectedVariant || selectedVariant.stock === 0 ? 'not-allowed' : 'pointer',
                     }}
                   >
                     −
@@ -424,16 +501,16 @@ export default function Home() {
                   </span>
                   <button
                     onClick={() =>
-                      setSelectedQty((q) => Math.min(selectedProduct.stock || 1, q + 1))
+                      setSelectedQty((q) => Math.min(selectedVariant?.stock || 1, q + 1))
                     }
-                    disabled={selectedProduct.stock === 0}
+                    disabled={!selectedVariant || selectedVariant.stock === 0}
                     style={{
                       width: 32,
                       height: 32,
                       border: 'none',
                       background: '#f3f4f6',
                       fontSize: 16,
-                      cursor: selectedProduct.stock === 0 ? 'not-allowed' : 'pointer',
+                      cursor: !selectedVariant || selectedVariant.stock === 0 ? 'not-allowed' : 'pointer',
                     }}
                   >
                     +
@@ -446,9 +523,10 @@ export default function Home() {
                 <button
                     className="home-add-to-cart"
                     style={{ alignSelf: 'flex-start', marginTop: 12 }}
-                    disabled={selectedProduct.stock === 0}
+                    disabled={!selectedVariant || selectedVariant.stock === 0}
                     onClick={() => {
-                    handleAddToCart(selectedProduct.id, selectedQty);
+                    if (!selectedVariant) return;
+                    handleAddToCart(selectedVariant.id, selectedQty);
                     setSelectedProduct(null);
                     }}
                 >

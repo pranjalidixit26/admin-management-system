@@ -4,20 +4,22 @@ import customerAxios from '../api/customerAxios';
 
 export interface CartItem {
   id: number;
-  productId: number;
+  variantId: number;
   name: string;
   price: number;
   imageUrl: string | null;
   qty: number;
   stock: number;
+  color: string | null;
+  size: string | null;
 }
 
 interface CartContextType {
   items: CartItem[];
   loading: boolean;
-  addToCart: (productId: number, qty: number) => Promise<void>;
-  removeFromCart: (productId: number) => Promise<void>;
-  updateQty: (productId: number, qty: number) => Promise<void>;
+  addToCart: (variantId: number, qty: number) => Promise<void>;
+  removeFromCart: (variantId: number) => Promise<void>;
+  updateQty: (variantId: number, qty: number) => Promise<void>;
   clearCart: () => Promise<void>;
   refreshCart: () => Promise<void>;
   totalItems: number;
@@ -26,16 +28,18 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-// Shape returned by the backend: { id, customerId, items: [{ id, product: {...}, quantity }] }
+// Shape returned by the backend: { id, customerId, items: [{ id, variant: { ..., product: {...} }, quantity }] }
 function mapCartResponse(data: any): CartItem[] {
   return (data.items || []).map((i: any) => ({
     id: i.id,
-    productId: i.product.id,
-    name: i.product.name,
-    price: i.product.price,
-    imageUrl: i.product.imageUrl,
+    variantId: i.variant.id,
+    name: i.variant.product.name,
+    price: i.variant.price ?? i.variant.product.price,
+    imageUrl: i.variant.product.imageUrl,
     qty: i.quantity,
-    stock: i.product.stock,
+    stock: i.variant.stock,
+    color: i.variant.color,
+    size: i.variant.size,
   }));
 }
 
@@ -67,24 +71,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
     refreshCart();
   }, [refreshCart]);
 
-  const addToCart = async (productId: number, qty: number) => {
+  const addToCart = async (variantId: number, qty: number) => {
     if (!isLoggedIn()) return; // guarded in UI too, safety net here
-    const res = await customerAxios.post('/cart/items', { productId, quantity: qty });
+    const res = await customerAxios.post('/cart/items', { variantId, quantity: qty });
     setItems(mapCartResponse(res.data));
   };
 
-  const removeFromCart = async (productId: number) => {
-    const item = items.find((i) => i.productId === productId);
+  const removeFromCart = async (variantId: number) => {
+    const item = items.find((i) => i.variantId === variantId);
     if (!item) return;
     const res = await customerAxios.delete(`/cart/items/${item.id}`);
     setItems(mapCartResponse(res.data));
   };
 
-  const updateQty = async (productId: number, qty: number) => {
-    const item = items.find((i) => i.productId === productId);
+  const updateQty = async (variantId: number, qty: number) => {
+    const item = items.find((i) => i.variantId === variantId);
     if (!item) return;
     if (qty <= 0) {
-      await removeFromCart(productId);
+      await removeFromCart(variantId);
       return;
     }
     const res = await customerAxios.patch(`/cart/items/${item.id}`, { quantity: qty });

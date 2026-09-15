@@ -55,9 +55,11 @@ export default function Cart() {
           >
             {/* Left: item list */}
             <div style={{ flex: '1 1 560px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {items.map((item) => (
+              {items.map((item) => {
+                const variantParts = [item.color, item.size].filter(Boolean);
+                return (
                 <div
-                  key={item.productId}
+                  key={item.variantId}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -89,6 +91,11 @@ export default function Cart() {
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 15 }}>{item.name}</div>
+                    {variantParts.length > 0 && (
+                      <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 2 }}>
+                        {variantParts.join(' / ')}
+                      </div>
+                    )}
                     <div style={{ color: '#6b7280', fontSize: 13 }}>₹{item.price} each</div>
                   </div>
 
@@ -105,7 +112,7 @@ export default function Cart() {
                                         <button
                       onClick={async () => {
                         try {
-                          await updateQty(item.productId, item.qty - 1);
+                          await updateQty(item.variantId, item.qty - 1);
                         } catch {
                           message.error('Could not update quantity');
                         }
@@ -127,7 +134,7 @@ export default function Cart() {
                                         <button
                       onClick={async () => {
                         try {
-                          await updateQty(item.productId, item.qty + 1);
+                          await updateQty(item.variantId, item.qty + 1);
                         } catch {
                           message.error('Cannot add more — stock limit reached');
                         }
@@ -153,7 +160,7 @@ export default function Cart() {
                                     <button
                     onClick={async () => {
                       try {
-                        await removeFromCart(item.productId);
+                        await removeFromCart(item.variantId);
                       } catch {
                         message.error('Could not remove item');
                       }
@@ -170,7 +177,8 @@ export default function Cart() {
                     Remove
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Right: sticky order summary */}
