@@ -35,7 +35,7 @@ function mapCartResponse(data: any): CartItem[] {
     variantId: i.variant.id,
     name: i.variant.product.name,
     price: i.variant.price ?? i.variant.product.price,
-    imageUrl: i.variant.product.imageUrl,
+    imageUrl: i.variant.images?.[0]?.imageUrl || i.variant.product.imageUrl,
     qty: i.quantity,
     stock: i.variant.stock,
     color: i.variant.color,

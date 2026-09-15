@@ -49,7 +49,9 @@ export class ProductVariant {
   })
   price: number | null;
 
-  @OneToMany(() => ProductVariantImage, (image) => image.variant)
+  @OneToMany(() => ProductVariantImage, (image) => image.variant, {
+    eager: true,
+  })
   images: ProductVariantImage[];
 
   @CreateDateColumn({ name: 'created_at' })

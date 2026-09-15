@@ -411,13 +411,17 @@ export default function Home() {
                 background: '#f5f5f5',
               }}
             >
-              {selectedProduct.imageUrl ? (
-                <img
-                  src={selectedProduct.imageUrl}
-                  alt={selectedProduct.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              ) : null}
+            {(() => {
+                const variantImage = selectedVariant?.images?.[0]?.imageUrl;
+                const displayImage = variantImage || selectedProduct.imageUrl;
+                return displayImage ? (
+                  <img
+                    src={displayImage}
+                    alt={selectedProduct.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : null;
+              })()}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               {selectedProduct.category && (
