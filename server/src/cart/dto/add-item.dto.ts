@@ -3,7 +3,7 @@ import { IsInt, IsPositive, IsOptional } from 'class-validator';
 export class AddItemDto {
     @IsInt()
     @IsPositive()
-    productId: number;
+    variantId: number;
 
     @IsOptional()
     @IsInt()

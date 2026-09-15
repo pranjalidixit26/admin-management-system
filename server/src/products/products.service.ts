@@ -94,7 +94,7 @@ export class ProductsService {
 
     const [data, total] = await this.productRepository.findAndCount({
       where,
-      relations: { category: true },
+      relations: { category: true, variants: { images: true } },
       skip: (page - 1) * limit,
       take: limit,
       order: { id: 'DESC' },

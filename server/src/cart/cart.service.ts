@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cart } from './entities/cart.entity';
 import { CartItem } from './entities/cart-item.entity';
-import { Product } from '../products/entities/product.entity';
+import { ProductVariant } from '../products/entities/product-variant.entity';
 import { AddItemDto } from './dto/add-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 
@@ -14,8 +14,8 @@ export class CartService {
         private readonly cartRepo: Repository<Cart>,
         @InjectRepository(CartItem)
         private readonly cartItemRepo: Repository<CartItem>,
-        @InjectRepository(Product)
-        private readonly productRepo: Repository<Product>,
+        @InjectRepository(ProductVariant)
+        private readonly variantRepo: Repository<ProductVariant>,
     ) {}
 
     // Fetches the customer's cart, creating an empty one if none exists yet.
@@ -33,27 +33,27 @@ export class CartService {
     }
 
     async addItem(customerId: number, dto: AddItemDto): Promise<Cart> {
-        const product = await this.productRepo.findOne({ where: { id: dto.productId } });
-        if (!product) {
-            throw new NotFoundException('Product not found');
+        const variant = await this.variantRepo.findOne({ where: { id: dto.variantId } });
+        if (!variant) {
+            throw new NotFoundException('Product variant not found');
         }
 
         const cart = await this.getOrCreateCart(customerId);
         const quantity = dto.quantity ?? 1;
 
-        const existing = cart.items.find((item) => item.product.id === dto.productId);
+        const existing = cart.items.find((item) => item.variant.id === dto.variantId);
         if (existing) {
             const newQty = existing.quantity + quantity;
-            if (newQty > product.stock) {
+            if (newQty > variant.stock) {
                 throw new BadRequestException('Requested quantity exceeds available stock');
             }
             existing.quantity = newQty;
             await this.cartItemRepo.save(existing);
         } else {
-            if (quantity > product.stock) {
+            if (quantity > variant.stock) {
                 throw new BadRequestException('Requested quantity exceeds available stock');
             }
-            const newItem = this.cartItemRepo.create({ cart, product, quantity });
+            const newItem = this.cartItemRepo.create({ cart, variant, quantity });
             await this.cartItemRepo.save(newItem);
         }
 
@@ -66,7 +66,7 @@ export class CartService {
         if (!item) {
             throw new NotFoundException('Cart item not found');
         }
-        if (dto.quantity > item.product.stock) {
+        if (dto.quantity > item.variant.stock) {
             throw new BadRequestException('Requested quantity exceeds available stock');
         }
         item.quantity = dto.quantity;

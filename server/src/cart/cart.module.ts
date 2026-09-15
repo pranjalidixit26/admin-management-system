@@ -4,12 +4,12 @@ import { CartService } from './cart.service';
 import { CartController } from './cart.controller';
 import { Cart } from './entities/cart.entity';
 import { CartItem } from './entities/cart-item.entity';
-import { Product } from '../products/entities/product.entity';
+import { ProductVariant } from '../products/entities/product-variant.entity';
 import { CustomerAuthModule } from '../customer-auth/customer-auth.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([Cart, CartItem, Product]),
+        TypeOrmModule.forFeature([Cart, CartItem, ProductVariant]),
         CustomerAuthModule,
     ],
     controllers: [CartController],
