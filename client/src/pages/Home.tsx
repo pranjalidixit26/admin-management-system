@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Avatar, Dropdown, Input, Spin, Empty, Modal, Tag, message } from 'antd';
+import { Avatar, Dropdown, Input, Empty, Modal, Tag, Select, message, Skeleton } from 'antd';
 import type { MenuProps } from 'antd';
 import axios from 'axios';
 import './Home.css';
@@ -24,8 +24,7 @@ interface ProductVariant {
   id: number;
   sku: string;
   productId: number;
-  color: string | null;
-  size: string | null;
+  attributes: Record<string, string> | null;
   stock: number;
   price: number | null;
   images: { id: number; imageUrl: string }[];
@@ -43,22 +42,20 @@ interface Product {
   variants: ProductVariant[];
 }
 
-// Builds a readable label for a variant chip, e.g. "Red / M", "Red", "M", or "Standard"
-function variantLabel(v: ProductVariant): string {
-  const parts = [v.color, v.size].filter(Boolean);
-  return parts.length > 0 ? parts.join(' / ') : 'Standard';
-}
-
 export default function Home() {
   const [customer, setCustomer] = useState<CustomerInfo | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [sort, setSort] = useState<string>('');
+  const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
   const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<number>>(new Set());
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [selectedQty, setSelectedQty] = useState<number>(1);
     const { addToCart, totalItems } = useCart();
   const navigate = useNavigate();
@@ -109,13 +106,20 @@ export default function Home() {
     const params: Record<string, string | number> = { limit: 100 };
     if (search) params.search = search;
     if (selectedCategoryId) params.categoryId = selectedCategoryId;
+    if (sort) params.sort = sort;
+    const nonEmptyFilters = Object.fromEntries(
+      Object.entries(activeFilters).filter(([, values]) => values.length > 0),
+    );
+    if (Object.keys(nonEmptyFilters).length > 0) {
+      params.attributes = JSON.stringify(nonEmptyFilters);
+    }
 
     axios
       .get('http://localhost:3000/products/public', { params })
       .then((res) => setProducts(res.data.data))
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
-  }, [search, selectedCategoryId]);
+  }, [search, selectedCategoryId, sort, activeFilters]);
 
   const handleLogout = () => {
     localStorage.removeItem('customer_access_token');
@@ -123,11 +127,101 @@ export default function Home() {
     setCustomer(null);
   };
 
-  const openProductModal = (p: Product) => {
-    setSelectedProduct(p);
-    setSelectedVariant(p.variants?.[0] ?? null);
-    setSelectedQty(1);
-  };
+    const getCategoryIcon = (name: string): string => {
+      const map: Record<string, string> = {
+        Electronics: '📱',
+        Clothing: '👕',
+        'Home & Kitchen': '🏠',
+        'Beauty & Personal Care': '💄',
+        'Books & Stationery': '📚',
+        'Sports & Fitness': '🏋️',
+        'Toys & Games': '🧸',
+        Groceries: '🛒',
+        Footwear: '👟',
+      };
+      return map[name] ?? '🏷️';
+    };
+
+    const openProductModal = (p: Product) => {
+        setSelectedProduct(p);
+        const first = p.variants?.[0] ?? null;
+        setSelectedAttributes(first?.attributes ? { ...first.attributes } : {});
+        setSelectedQty(1);
+        setActiveImageIndex(0);
+    };
+
+    // Ordered list of distinct attribute keys across this product's variants.
+    // "Color" (if present) always comes first so it renders as the primary selector.
+    const attributeKeys = selectedProduct
+      ? (() => {
+          const keysSet = new Set<string>();
+          selectedProduct.variants.forEach((v) => {
+            Object.keys(v.attributes ?? {}).forEach((k) => keysSet.add(k));
+          });
+          const keys = Array.from(keysSet);
+          keys.sort((a, b) => {
+            if (a.toLowerCase() === 'color') return -1;
+            if (b.toLowerCase() === 'color') return 1;
+            return 0;
+          });
+          return keys;
+        })()
+      : [];
+
+    // The single variant matching every currently selected attribute value
+    const selectedVariant =
+      selectedProduct?.variants.find((v) =>
+        attributeKeys.every((key) => (v.attributes?.[key] ?? '') === (selectedAttributes[key] ?? '')),
+      ) ?? null;
+
+    // Variants that match the selections made for attribute keys BEFORE the given key
+    // (used to narrow down which option values are relevant to show for that key)
+    const variantsMatchingPriorSelections = (key: string) => {
+      if (!selectedProduct) return [];
+      const priorKeys = attributeKeys.slice(0, attributeKeys.indexOf(key));
+      return selectedProduct.variants.filter((v) =>
+        priorKeys.every((k) => (v.attributes?.[k] ?? '') === (selectedAttributes[k] ?? '')),
+      );
+    };
+
+    // Unique option values for a given attribute key, each with one representative variant
+    // (used for the Color swatch thumbnail, and for stock-checking the last attribute)
+    const optionsForKey = (key: string) => {
+      const candidates = variantsMatchingPriorSelections(key);
+      const seen = new Map<string, ProductVariant>();
+      candidates.forEach((v) => {
+        const val = v.attributes?.[key];
+        if (val && !seen.has(val)) seen.set(val, v);
+      });
+      return Array.from(seen.entries()).map(([value, variant]) => ({ value, variant }));
+    };
+
+    const handleAttributeSelect = (key: string, value: string) => {
+      if (!selectedProduct) return;
+      setSelectedAttributes((prev) => {
+        const next = { ...prev, [key]: value };
+        // If this change invalidates a later attribute's current selection, fall back
+        // to the first still-available option for that later attribute
+        const keyIndex = attributeKeys.indexOf(key);
+        for (let i = keyIndex + 1; i < attributeKeys.length; i++) {
+          const laterKey = attributeKeys[i];
+          const stillValid = selectedProduct.variants.some((v) =>
+            attributeKeys.slice(0, i + 1).every((k) => (v.attributes?.[k] ?? '') === (next[k] ?? '')),
+          );
+          if (!stillValid) {
+            const fallback = selectedProduct.variants.find((v) =>
+              attributeKeys.slice(0, i).every((k) => (v.attributes?.[k] ?? '') === (next[k] ?? '')),
+            );
+            if (fallback?.attributes?.[laterKey]) {
+              next[laterKey] = fallback.attributes[laterKey];
+            }
+          }
+        }
+        return next;
+      });
+      setSelectedQty(1);
+      setActiveImageIndex(0);
+    };
 
   const menuItems: MenuProps['items'] = [
     {
@@ -142,6 +236,19 @@ export default function Home() {
     { type: 'divider' },
     { key: 'logout', label: 'Logout', onClick: handleLogout },
   ];
+
+  useEffect(() => {
+    const params: Record<string, number> = {};
+    if (selectedCategoryId) params.categoryId = selectedCategoryId;
+
+    axios
+      .get('http://localhost:3000/products/public/filters', { params })
+      .then((res) => setFilters(res.data))
+      .catch(() => setFilters({}));
+
+    // category badalne par purane attribute filters ab valid na ho, isliye reset
+    setActiveFilters({});
+  }, [selectedCategoryId]);
 
   // derive unique categories from the currently loaded products
   const flatCategories: { id: number; name: string }[] = [];
@@ -160,8 +267,8 @@ export default function Home() {
         <span className="home-logo">
           <svg
             className="home-logo-icon"
-            width="22"
-            height="22"
+            width="30"
+            height="30"
             viewBox="0 0 24 24"
             fill="none"
             stroke="#4C6FFF"
@@ -177,7 +284,7 @@ export default function Home() {
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
         <Link to="/cart" style={{ position: 'relative', cursor: 'pointer', display: 'flex' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="9" cy="21" r="1" />
             <circle cx="20" cy="21" r="1" />
             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
@@ -186,14 +293,14 @@ export default function Home() {
             <span
               style={{
                 position: 'absolute',
-                top: -8,
-                right: -8,
+                top: -10,
+                right: -10,
                 background: '#4C6FFF',
                 color: '#fff',
                 borderRadius: '50%',
-                width: 18,
-                height: 18,
-                fontSize: 11,
+                width: 20,
+                height: 20,
+                fontSize: 12,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -207,7 +314,7 @@ export default function Home() {
         {customer ? (
           <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={['click']}>
             <div style={{ cursor: 'pointer' }}>
-              <Avatar size={32} style={{ backgroundColor: '#4f46e5' }}>
+              <Avatar size={42} style={{ backgroundColor: '#4f46e5' }}>
                 {customer.name?.[0]?.toUpperCase()}
               </Avatar>
             </div>
@@ -230,8 +337,21 @@ export default function Home() {
             placeholder="Search products..."
             allowClear
             onSearch={(val) => setSearch(val)}
+            onChange={(e) => {
+              if (e.target.value === '') {
+                setSearch('');
+              }
+            }}
             className="home-search-bar"
           />
+        </section>
+
+        <section className="home-promo-banner">
+          <div className="home-promo-content">
+            <span className="home-promo-tag">Limited Time</span>
+            <h3 className="home-promo-title">Big Savings Across Categories</h3>
+            <p className="home-promo-desc">Explore deals on Electronics, Fashion, Home & Kitchen, and more.</p>
+          </div>
         </section>
 
         <section className="home-shop-layout">
@@ -253,6 +373,7 @@ export default function Home() {
                       className={`home-sidebar-link ${selectedCategoryId === c.id ? 'active' : ''}`}
                       onClick={() => setSelectedCategoryId(c.id)}
                     >
+                      <span style={{ marginRight: 8 }}>{getCategoryIcon(c.name)}</span>
                       {c.name}
                     </button>
                     {hasChildren && (
@@ -291,9 +412,54 @@ export default function Home() {
                 ? 'All Products'
                 : (flatCategories.find((c) => c.id === selectedCategoryId)?.name ?? 'Products')}
             </h3>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <Select
+                value={sort || undefined}
+                placeholder="Sort by"
+                allowClear
+                style={{ width: 180 }}
+                onChange={(val) => setSort(val ?? '')}
+                options={[
+                  { value: 'price_asc', label: 'Price: Low to High' },
+                  { value: 'price_desc', label: 'Price: High to Low' },
+                ]}
+              />
+                            <Select
+                mode="multiple"
+                placeholder="Filter by attribute"
+                allowClear
+                style={{ minWidth: 260 }}
+                maxTagCount={3}
+                value={Object.entries(activeFilters).flatMap(([key, vals]) =>
+                  vals.map((v) => `${key}::${v}`),
+                )}
+                onChange={(selected: string[]) => {
+                  const next: Record<string, string[]> = {};
+                  selected.forEach((item) => {
+                    const [key, value] = item.split('::');
+                    if (!next[key]) next[key] = [];
+                    next[key].push(value);
+                  });
+                  setActiveFilters(next);
+                }}
+                options={Object.entries(filters).map(([key, values]) => ({
+                  label: key,
+                  title: key,
+                  options: values.map((v) => ({
+                    value: `${key}::${v}`,
+                    label: v,
+                  })),
+                }))}
+              />
+            </div>
             <div className="home-product-grid">
             {loading ? (
-              <div className="home-grid-loading"><Spin size="large" /></div>
+              Array.from({ length: 10 }).map((_, i) => (
+                <div className="home-product-card" key={`skeleton-${i}`} style={{ padding: 14 }}>
+                  <Skeleton.Image active style={{ width: '100%', height: 180 }} />
+                  <Skeleton active paragraph={{ rows: 2 }} style={{ marginTop: 12 }} />
+                </div>
+              ))
             ) : products.length === 0 ? (
               <Empty description="No products found" style={{ margin: '48px auto' }} />
             ) : (
@@ -316,7 +482,43 @@ export default function Home() {
                   </div>
                   <div className="home-product-info">
                     {p.category && <span className="home-product-category">{p.category.name}</span>}
-                    <h4 className="home-product-name">{p.name}</h4>
+                                        <h4 className="home-product-name">{p.name}</h4>
+                {hasMultipleVariants && (() => {
+  const uniqueColors = Array.from(
+    new Set(
+      p.variants
+        .map((v) => {
+          const key = Object.keys(v.attributes ?? {}).find(
+            (k) => k.toLowerCase() === 'color'
+          );
+          return key ? v.attributes![key] : undefined;
+        })
+        .filter(Boolean)
+    )
+  ) as string[];
+  return uniqueColors.length > 0 ? (
+                        <div style={{ display: 'flex', gap: 4, margin: '4px 0' }}>
+                          {uniqueColors.map((c) => (
+                            <span
+                              key={c}
+                              title={c}
+                              style={{
+                                width: 14,
+                                height: 14,
+                                borderRadius: '50%',
+                                background: c.toLowerCase(),
+                                border: '1px solid #d1d5db',
+                              }}
+                            />
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
+                    {!hasMultipleVariants && singleVariant && singleVariant.stock === 0 && (
+                      <Tag color="red" style={{ marginBottom: 4, width: 'fit-content' }}>
+                        Out of Stock
+                      </Tag>
+                    )}
                     <div className="home-product-bottom">
                       <span className="home-product-price">₹{p.price}</span>
                         {hasMultipleVariants ? (
@@ -337,8 +539,13 @@ export default function Home() {
                             if (singleVariant) handleAddToCart(singleVariant.id, 1);
                             }}
                             disabled={!singleVariant || singleVariant.stock === 0}
+                            style={
+                              !singleVariant || singleVariant.stock === 0
+                                ? { background: '#fff1f0', color: '#cf1322', border: '1px solid #ffa39e', cursor: 'not-allowed' }
+                                : undefined
+                            }
                         >
-                            Add to Cart
+                            {!singleVariant || singleVariant.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
                       </button>
                         )}
                     </div>
@@ -401,27 +608,54 @@ export default function Home() {
       >
         {selectedProduct && (
           <div style={{ display: 'flex', gap: 24, paddingTop: 8 }}>
-            <div
-              style={{
-                width: 220,
-                height: 220,
-                flexShrink: 0,
-                borderRadius: 8,
-                overflow: 'hidden',
-                background: '#f5f5f5',
-              }}
-            >
-            {(() => {
-                const variantImage = selectedVariant?.images?.[0]?.imageUrl;
-                const displayImage = variantImage || selectedProduct.imageUrl;
-                return displayImage ? (
-                  <img
-                    src={displayImage}
-                    alt={selectedProduct.name}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                ) : null;
-              })()}
+                        <div style={{ width: 220, flexShrink: 0 }}>
+              <div
+                style={{
+                  width: 220,
+                  height: 220,
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  background: '#f5f5f5',
+                }}
+              >
+                {(() => {
+                  const variantImages = selectedVariant?.images ?? [];
+                  const displayImage = variantImages[activeImageIndex]?.imageUrl || selectedProduct.imageUrl;
+                  return displayImage ? (
+                    <img
+                      src={displayImage}
+                      alt={selectedProduct.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : null;
+                })()}
+              </div>
+              {(selectedVariant?.images?.length ?? 0) > 1 && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  {selectedVariant!.images.map((img, idx) => (
+                    <button
+                      key={img.id}
+                      onClick={() => setActiveImageIndex(idx)}
+                      style={{
+                        width: 44,
+                        height: 44,
+                        padding: 0,
+                        borderRadius: 6,
+                        overflow: 'hidden',
+                        border: activeImageIndex === idx ? '2px solid #4C6FFF' : '1px solid #d1d5db',
+                        cursor: 'pointer',
+                        background: 'none',
+                      }}
+                    >
+                      <img
+                        src={img.imageUrl}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               {selectedProduct.category && (
@@ -434,47 +668,81 @@ export default function Home() {
                 ₹{selectedVariant?.price ?? selectedProduct.price}
               </div>
 
-              {(selectedProduct.variants?.length ?? 0) > 1 && (
-                <div style={{ marginBottom: 12 }}>
-                  <span style={{ fontSize: 13, color: '#374151', fontWeight: 500, display: 'block', marginBottom: 6 }}>
-                    Options:
-                  </span>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {selectedProduct.variants.map((v) => (
-                      <button
-                        key={v.id}
-                        onClick={() => {
-                          setSelectedVariant(v);
-                          setSelectedQty(1);
-                        }}
-                        disabled={v.stock === 0}
-                        style={{
-                          padding: '6px 14px',
-                          borderRadius: 20,
-                          border: selectedVariant?.id === v.id ? '2px solid #4C6FFF' : '1px solid #d1d5db',
-                          background: selectedVariant?.id === v.id ? '#eef2ff' : '#fff',
-                          color: v.stock === 0 ? '#9ca3af' : '#1f2937',
-                          fontSize: 13,
-                          fontWeight: 500,
-                          cursor: v.stock === 0 ? 'not-allowed' : 'pointer',
-                          textDecoration: v.stock === 0 ? 'line-through' : 'none',
-                        }}
-                      >
-                        {variantLabel(v)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {(selectedProduct.variants?.length ?? 0) > 1 &&
+                attributeKeys.map((key) => {
+                  const options = optionsForKey(key);
+                  if (options.length === 0) return null;
+                  const isColor = key.toLowerCase() === 'color';
+                  const isLastKey = attributeKeys.indexOf(key) === attributeKeys.length - 1;
 
-              <Tag
-                color={(selectedVariant?.stock ?? 0) > 0 ? 'green' : 'red'}
-                style={{ width: 'fit-content', marginBottom: 12 }}
-              >
-                {(selectedVariant?.stock ?? 0) > 0
-                  ? `In Stock (${selectedVariant?.stock})`
-                  : 'Out of Stock'}
-              </Tag>
+                  return (
+                    <div key={key} style={{ marginBottom: 12 }}>
+                      <span style={{ fontSize: 13, color: '#374151', fontWeight: 500, display: 'block', marginBottom: 6 }}>
+                        {key}{isColor && selectedAttributes[key] ? `: ${selectedAttributes[key]}` : ''}
+                      </span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {options.map(({ value, variant }) => {
+                          const isSelected = selectedAttributes[key] === value;
+                          const disabled = isLastKey && variant.stock === 0;
+
+                          if (isColor) {
+                            const thumbnail = variant.images?.[0]?.imageUrl || selectedProduct.imageUrl;
+                            return (
+                              <button
+                                key={value}
+                                onClick={() => handleAttributeSelect(key, value)}
+                                title={value}
+                                style={{
+                                  width: 48,
+                                  height: 48,
+                                  padding: 0,
+                                  borderRadius: 6,
+                                  overflow: 'hidden',
+                                  border: isSelected ? '2px solid #4C6FFF' : '1px solid #d1d5db',
+                                  cursor: 'pointer',
+                                  background: 'none',
+                                }}
+                              >
+                                {thumbnail ? (
+                                  <img src={thumbnail} alt={value} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  <div style={{ width: '100%', height: '100%', background: value.toLowerCase() }} />
+                                )}
+                              </button>
+                            );
+                          }
+
+                          return (
+                            <button
+                              key={value}
+                              onClick={() => handleAttributeSelect(key, value)}
+                              disabled={disabled}
+                              style={{
+                                padding: '6px 14px',
+                                borderRadius: 6,
+                                border: isSelected ? '2px solid #4C6FFF' : '1px solid #d1d5db',
+                                background: isSelected ? '#eef2ff' : '#fff',
+                                color: disabled ? '#9ca3af' : '#1f2937',
+                                fontSize: 13,
+                                fontWeight: 500,
+                                cursor: disabled ? 'not-allowed' : 'pointer',
+                                textDecoration: disabled ? 'line-through' : 'none',
+                              }}
+                            >
+                              {value}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {(selectedVariant?.stock ?? 0) > 0 && (
+                <Tag color="green" style={{ width: 'fit-content', marginBottom: 12 }}>
+                  In Stock ({selectedVariant?.stock})
+                </Tag>
+              )}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                 <span style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>Quantity:</span>
                 <div
@@ -524,9 +792,15 @@ export default function Home() {
               <p style={{ color: '#6b7280', fontSize: 14, lineHeight: 1.6, flex: 1 }}>
                 {selectedProduct.description || 'No description available.'}
               </p>
-                <button
+                                <button
                     className="home-add-to-cart"
-                    style={{ alignSelf: 'flex-start', marginTop: 12 }}
+                    style={{
+                      alignSelf: 'flex-start',
+                      marginTop: 12,
+                        ...(!selectedVariant || selectedVariant.stock === 0
+                        ? { background: '#fff1f0', color: '#cf1322', border: '1px solid #ffa39e', cursor: 'not-allowed' }
+                        : {}),
+                    }}
                     disabled={!selectedVariant || selectedVariant.stock === 0}
                     onClick={() => {
                     if (!selectedVariant) return;
@@ -534,7 +808,7 @@ export default function Home() {
                     setSelectedProduct(null);
                     }}
                 >
-                    Add to Cart
+                    {!selectedVariant || selectedVariant.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
               </button>
             </div>
           </div>

@@ -5,6 +5,7 @@ import {
   Min,
   ValidateNested,
   IsArray,
+  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -18,13 +19,9 @@ export class VariantImageDto {
 }
 
 export class VariantDto {
-  @IsString()
+  @IsObject()
   @IsOptional()
-  color?: string;
-
-  @IsString()
-  @IsOptional()
-  size?: string;
+  attributes?: Record<string, string>;
 
   @IsNumber()
   @Min(0)

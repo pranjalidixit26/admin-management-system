@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Modal, Form, Input, InputNumber, Select, Switch, Button, Card, Space, Divider } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Modal, Form, Input, InputNumber, Select, Switch, Button, Card, Space, Divider, AutoComplete } from 'antd';
+import { PlusOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
 import api from '../../api/axios';
 
 interface Category {
@@ -17,10 +17,23 @@ interface VariantImage {
 
 interface Variant {
   id?: number;
-  color?: string | null;
-  size?: string | null;
+  attributes?: Record<string, string> | null;
   stock?: number;
   price?: number | null;
+  images?: VariantImage[];
+}
+
+// Form-only shape: attributes are edited as a key/value list, converted
+// to/from Record<string,string> when loading/submitting the form.
+interface AttributeEntry {
+  key?: string;
+  value?: string;
+}
+
+interface VariantFormEntry {
+  attributes?: AttributeEntry[];
+  stock?: number;
+  price?: number;
   images?: VariantImage[];
 }
 
@@ -46,6 +59,18 @@ interface ProductFormProps {
 export default function ProductForm({ open, editingProduct, onSuccess, onCancel }: ProductFormProps) {
   const [form] = Form.useForm();
   const [categories, setCategories] = useState<Category[]>([]);
+  const watchedVariants = Form.useWatch('variants', form) as VariantFormEntry[] | undefined;
+
+  // Suggest attribute keys already used elsewhere in this product (e.g. "Color", "Size", "Quantity")
+  const attributeKeySuggestions = Array.from(
+    new Set(
+      (watchedVariants ?? [])
+        .flatMap((v) => v?.attributes ?? [])
+        .map((a) => a?.key)
+        .filter(Boolean),
+    ),
+  ).map((k) => ({ value: k as string }));
+
   const [loadingCategories, setLoadingCategories] = useState(false);
 
   useEffect(() => {
@@ -61,16 +86,17 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
 
   useEffect(() => {
     if (editingProduct) {
+      const formVariants: VariantFormEntry[] = (editingProduct.variants ?? []).map((v) => ({
+        attributes: Object.entries(v.attributes ?? {}).map(([key, value]) => ({ key, value })),
+        stock: v.stock ?? 0,
+        price: v.price ?? undefined,
+        images: (v.images ?? []).map((img) => ({ imageUrl: img.imageUrl })),
+      }));
+
       form.setFieldsValue({
         ...editingProduct,
         categoryId: editingProduct.category?.id,
-        variants: (editingProduct.variants ?? []).map((v) => ({
-          color: v.color ?? undefined,
-          size: v.size ?? undefined,
-          stock: v.stock ?? 0,
-          price: v.price ?? undefined,
-          images: (v.images ?? []).map((img) => ({ imageUrl: img.imageUrl })),
-        })),
+        variants: formVariants,
       });
     } else {
       form.resetFields();
@@ -95,15 +121,22 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
     try {
       const values = await form.validateFields();
 
-      const variants = (values.variants ?? []).map((v: any) => ({
-        color: v.color || undefined,
-        size: v.size || undefined,
-        stock: v.stock ?? 0,
-        price: v.price ?? undefined,
-        images: (v.images ?? [])
-          .filter((img: any) => img?.imageUrl)
-          .map((img: any, idx: number) => ({ imageUrl: img.imageUrl, sortOrder: idx })),
-      }));
+      const formVariants = (values.variants ?? []) as VariantFormEntry[];
+      const variants = formVariants.map((v) => {
+        const attributes: Record<string, string> = {};
+        (v.attributes ?? []).forEach((a) => {
+          if (a?.key) attributes[a.key] = a.value ?? '';
+        });
+
+        return {
+          attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
+          stock: v.stock ?? 0,
+          price: v.price ?? undefined,
+          images: (v.images ?? [])
+            .filter((img: any) => img?.imageUrl)
+            .map((img: any, idx: number) => ({ imageUrl: img.imageUrl, sortOrder: idx })),
+        };
+      });
 
       const payload = { ...values, variants };
 
@@ -174,16 +207,58 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
                   style={{ marginBottom: 16 }}
                   title={`Variant ${name + 1}`}
                   extra={
-                    <Button danger type="text" icon={<DeleteOutlined />} onClick={() => remove(name)} />
+                    <Space>
+                      <Button
+                        type="text"
+                        icon={<CopyOutlined />}
+                        title="Duplicate variant"
+                        onClick={() => {
+                          const current = form.getFieldValue(['variants', name]);
+                          add({ ...current, id: undefined }, name + 1);
+                        }}
+                      />
+                      <Button danger type="text" icon={<DeleteOutlined />} onClick={() => remove(name)} />
+                    </Space>
                   }
                 >
-                  <Space style={{ display: 'flex' }} align="baseline" wrap>
-                    <Form.Item {...restField} name={[name, 'color']} label="Color">
-                      <Input placeholder="e.g. Red" />
-                    </Form.Item>
-                    <Form.Item {...restField} name={[name, 'size']} label="Size">
-                      <Input placeholder="e.g. M" />
-                    </Form.Item>
+                  <div style={{ marginBottom: 8, fontWeight: 500 }}>Attributes</div>
+                  <Form.List name={[name, 'attributes']}>
+                    {(attrFields, { add: addAttr, remove: removeAttr }) => (
+                      <>
+                        {attrFields.map(({ key: attrKey, name: attrName, ...attrRestField }) => (
+                          <Space key={attrKey} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
+                            <Form.Item
+                              {...attrRestField}
+                              name={[attrName, 'key']}
+                              style={{ marginBottom: 0 }}
+                            >
+                              <AutoComplete
+                                options={attributeKeySuggestions}
+                                placeholder="e.g. Color, Size, Quantity"
+                                filterOption={(inputValue, option) =>
+                                  (option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase())
+                                }
+                                style={{ width: 180 }}
+                              />
+                            </Form.Item>
+                            <Form.Item
+                              {...attrRestField}
+                              name={[attrName, 'value']}
+                              style={{ marginBottom: 0 }}
+                            >
+                              <Input placeholder="e.g. Black, 200ml" style={{ width: 180 }} />
+                            </Form.Item>
+                            <Button danger type="text" icon={<DeleteOutlined />} onClick={() => removeAttr(attrName)} />
+                          </Space>
+                        ))}
+                        <Button type="dashed" size="small" onClick={() => addAttr()} icon={<PlusOutlined />}>
+                          Add Attribute
+                        </Button>
+                      </>
+                    )}
+                  </Form.List>
+
+                  <Space style={{ display: 'flex', marginTop: 16 }} align="baseline" wrap>
                     <Form.Item {...restField} name={[name, 'stock']} label="Stock">
                       <InputNumber min={0} />
                     </Form.Item>
@@ -216,7 +291,12 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
                   </Form.List>
                 </Card>
               ))}
-              <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />} block>
+              <Button
+                type="dashed"
+                onClick={() => add({ attributes: [{}] })}
+                icon={<PlusOutlined />}
+                block
+              >
                 Add Variant
               </Button>
             </>

@@ -33,13 +33,38 @@ export class ProductsController {
     @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('categoryId') categoryId?: string,
+    @Query('sort') sort?: string,
+    @Query('attributes') attributes?: string,
   ) {
+    let parsedAttributes: Record<string, string[]> | undefined;
+    if (attributes) {
+      try {
+        parsedAttributes = JSON.parse(attributes);
+      } catch {
+        parsedAttributes = undefined;
+      }
+    }
+
     return this.productsService.findPublic(
       page ? +page : 1,
       limit ? +limit : 12,
       search,
       categoryId ? +categoryId : undefined,
+      sort,
+      parsedAttributes,
     );
+  }
+
+  @Get('public/filters')
+  getPublicFilters(@Query('categoryId') categoryId?: string) {
+    return this.productsService.getPublicFilters(
+      categoryId ? +categoryId : undefined,
+    );
+  }
+
+  @Get('public/:id')
+  findOnePublic(@Param('id') id: string) {
+    return this.productsService.findOnePublic(+id);
   }
 
   @Get()

@@ -37,8 +37,7 @@ export class ProductsService {
       const defaultVariant = this.productVariantRepository.create({
         sku: `PROD-${savedProduct.id}-DEFAULT`,
         productId: savedProduct.id,
-        color: null,
-        size: null,
+        attributes: null,
         stock: savedProduct.stock,
         price: null,
       });
@@ -77,9 +76,97 @@ export class ProductsService {
     return product;
   }
 
-  async findPublic(page = 1, limit = 12, search?: string, categoryId?: number) {
+  async findOnePublic(id: number): Promise<Product> {
+    const product = await this.productRepository.findOne({
+      where: { id, status: true },
+      relations: { category: true, variants: { images: true } },
+    });
+    if (!product) {
+      throw new NotFoundException(`Product with id ${id} not found`);
+    }
+    return product;
+  }
+
+    async findPublic(
+    page = 1,
+    limit = 12,
+    search?: string,
+    categoryId?: number,
+    sort?: string,
+    attributes?: Record<string, string[]>,
+  ) {
+    const qb = this.productRepository
+      .createQueryBuilder('product')
+      .leftJoin('product.category', 'category')
+      .where('product.status = :status', { status: true });
+
+    if (search) {
+      qb.andWhere(
+        '(product.name LIKE :search OR category.name LIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    if (categoryId) {
+      const category = await this.categoryRepository.findOne({
+        where: { id: categoryId },
+        relations: { subcategories: true },
+      });
+      const categoryIds = category
+        ? [category.id, ...category.subcategories.map((sub) => sub.id)]
+        : [categoryId];
+      qb.andWhere('category.id IN (:...categoryIds)', { categoryIds });
+    }
+
+    if (attributes) {
+      Object.entries(attributes).forEach(([key, values], idx) => {
+        if (!values || values.length === 0) return;
+        const jsonPathParam = `attrJsonPath${idx}`;
+        const valuesParam = `attrValues${idx}`;
+        qb.andWhere(
+          `EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = product.id AND JSON_UNQUOTE(JSON_EXTRACT(pv.attributes, :${jsonPathParam})) IN (:...${valuesParam}))`,
+          { [jsonPathParam]: `$."${key}"`, [valuesParam]: values },
+        );
+      });
+    }
+
+    const total = await qb.getCount();
+
+    qb.orderBy(
+      sort === 'price_asc' || sort === 'price_desc' ? 'product.price' : 'product.id',
+      sort === 'price_asc' ? 'ASC' : sort === 'price_desc' ? 'DESC' : 'DESC',
+    );
+
+    const idRows = await qb
+      .select('product.id', 'id')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getRawMany();
+    const ids = idRows.map((r) => r.id);
+
+    if (ids.length === 0) {
+      return { data: [], total, page, limit, totalPages: Math.ceil(total / limit) };
+    }
+
+    const data = await this.productRepository.find({
+      where: { id: In(ids) },
+      relations: { category: true, variants: { images: true } },
+    });
+
+    const orderIndex = new Map(ids.map((id, idx) => [id, idx]));
+    data.sort((a, b) => orderIndex.get(a.id)! - orderIndex.get(b.id)!);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getPublicFilters(categoryId?: number): Promise<Record<string, string[]>> {
     const where: any = { status: true };
-    if (search) where.name = Like(`%${search}%`);
 
     if (categoryId) {
       const category = await this.categoryRepository.findOne({
@@ -92,21 +179,32 @@ export class ProductsService {
       where.category = { id: In(categoryIds) };
     }
 
-    const [data, total] = await this.productRepository.findAndCount({
+    const products = await this.productRepository.find({
       where,
-      relations: { category: true, variants: { images: true } },
-      skip: (page - 1) * limit,
-      take: limit,
-      order: { id: 'DESC' },
+      relations: { variants: true },
     });
 
-    return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+    const filterMap = new Map<string, Set<string>>();
+
+    for (const product of products) {
+      for (const variant of product.variants ?? []) {
+        if (!variant.attributes) continue;
+        for (const [key, value] of Object.entries(variant.attributes)) {
+          if (!value) continue;
+          if (!filterMap.has(key)) {
+            filterMap.set(key, new Set());
+          }
+          filterMap.get(key)!.add(value);
+        }
+      }
+    }
+
+    const result: Record<string, string[]> = {};
+    for (const [key, values] of filterMap.entries()) {
+      result[key] = Array.from(values).sort();
+    }
+
+    return result;
   }
 
   async update(id: number, updateProductDto: UpdateProductDto): Promise<Product> {
@@ -144,8 +242,7 @@ export class ProductsService {
       const variant = this.productVariantRepository.create({
         sku: `PROD-${product.id}-${i + 1}`,
         productId: product.id,
-        color: v.color ?? null,
-        size: v.size ?? null,
+        attributes: v.attributes && Object.keys(v.attributes).length > 0 ? v.attributes : null,
         stock: v.stock ?? 0,
         price: v.price ?? null,
       });

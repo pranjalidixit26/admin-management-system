@@ -29,11 +29,8 @@ export class ProductVariant {
   @JoinColumn({ name: 'product_id' })
   product: Product;
 
-  @Column({ type: 'varchar', nullable: true })
-  color: string | null;
-
-  @Column({ type: 'varchar', nullable: true })
-  size: string | null;
+  @Column({ type: 'json', nullable: true })
+  attributes: Record<string, string> | null;
 
   @Column({ type: 'int', default: 0 })
   stock: number;
