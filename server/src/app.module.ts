@@ -13,6 +13,7 @@ import { CustomersModule } from './customers/customers.module';
 import { CustomerAuthModule } from './customer-auth/customer-auth.module';
 import { CartModule } from './cart/cart.module';
 import { AddressesModule } from './addresses/addresses.module';
+import { OrdersModule } from './orders/orders.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { AddressesModule } from './addresses/addresses.module';
     CustomerAuthModule,
     CartModule,
     AddressesModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
