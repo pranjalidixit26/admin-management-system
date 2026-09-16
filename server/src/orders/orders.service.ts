@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import PDFDocument from 'pdfkit';
 import { Order, OrderStatus } from './order.entity';
 import { OrderItem } from './order-item.entity';
 import { Address } from '../addresses/address.entity';
@@ -99,14 +100,112 @@ export class OrdersService {
     async findAllForCustomer(customerId: number) {
         return this.orderRepo.find({
             where: { customerId },
+            relations: { items: { variant: { images: true, product: true } } },
             order: { created_at: 'DESC' },
         });
     }
 
-    async findOne(customerId: number, id: number) {
+    async cancel(customerId: number, id: number) {
         const order = await this.orderRepo.findOne({ where: { id } });
         if (!order) throw new NotFoundException('Order not found');
         if (order.customerId !== customerId) throw new ForbiddenException();
+        if (order.status === OrderStatus.CANCELLED) {
+            throw new BadRequestException('Order is already cancelled');
+        }
+        if (order.status === OrderStatus.DELIVERED) {
+            throw new BadRequestException('Delivered orders cannot be cancelled');
+        }
+        order.status = OrderStatus.CANCELLED;
+        return this.orderRepo.save(order);
+    }
+
+    async findOne(customerId: number, id: number) {
+        const order = await this.orderRepo.findOne({
+            where: { id },
+            relations: { items: { variant: { images: true, product: true } } },
+        });
+        if (!order) throw new NotFoundException('Order not found');
+        if (order.customerId !== customerId) throw new ForbiddenException();
         return order;
+    }
+
+        async generateInvoicePdf(customerId: number, id: number): Promise<Buffer> {
+        const order = await this.orderRepo.findOne({
+            where: { id },
+            relations: { items: true },
+        });
+        if (!order) throw new NotFoundException('Order not found');
+        if (order.customerId !== customerId) throw new ForbiddenException();
+
+        return new Promise((resolve, reject) => {
+            const doc = new PDFDocument({ margin: 50 });
+            const chunks: Buffer[] = [];
+            doc.on('data', (chunk) => chunks.push(chunk));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+
+            // Header
+            doc.fontSize(20).text('ShopNest', { align: 'left' });
+            doc.fontSize(10).fillColor('#666').text('Tax Invoice', { align: 'left' });
+            doc.moveDown(1.5);
+
+            // Order info
+            doc.fillColor('#000').fontSize(12).text(`Invoice for Order #${order.id}`);
+            doc.fontSize(10).fillColor('#666').text(
+                `Date: ${new Date(order.created_at).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                })}`,
+            );
+            doc.text(`Status: ${order.status.charAt(0).toUpperCase() + order.status.slice(1)}`);
+            doc.moveDown();
+
+            // Shipping address
+            doc.fillColor('#000').fontSize(11).text('Shipping Address:', { underline: true });
+            doc.fontSize(10).fillColor('#333');
+            doc.text(order.addressLine);
+            doc.text(`${order.city}, ${order.state} ${order.pincode}`);
+            doc.text(`${order.country} | Phone: ${order.phone}`);
+            doc.moveDown(1.5);
+
+            // Items table header
+            doc.fillColor('#000').fontSize(11).text('Items', { underline: true });
+            doc.moveDown(0.5);
+
+            const tableTop = doc.y;
+            doc.fontSize(10).fillColor('#000');
+            doc.text('Item', 50, tableTop, { width: 220 });
+            doc.text('Qty', 280, tableTop, { width: 60, align: 'right' });
+            doc.text('Price', 350, tableTop, { width: 80, align: 'right' });
+            doc.text('Subtotal', 440, tableTop, { width: 100, align: 'right' });
+            doc.moveDown(0.5);
+            doc.moveTo(50, doc.y).lineTo(540, doc.y).strokeColor('#ccc').stroke();
+            doc.moveDown(0.5);
+
+            order.items.forEach((item) => {
+                const rowY = doc.y;
+                doc.fontSize(10).fillColor('#333');
+                doc.text(item.productName, 50, rowY, { width: 220 });
+                doc.text(String(item.quantity), 280, rowY, { width: 60, align: 'right' });
+                doc.text(`Rs. ${item.price}`, 350, rowY, { width: 80, align: 'right' });
+                doc.text(`Rs. ${item.price * item.quantity}`, 440, rowY, { width: 100, align: 'right' });
+                doc.moveDown(0.8);
+            });
+
+            doc.moveDown(0.5);
+            doc.moveTo(50, doc.y).lineTo(540, doc.y).strokeColor('#ccc').stroke();
+            doc.moveDown(0.5);
+
+            doc.fontSize(12).fillColor('#000').text(
+                `Total: Rs. ${order.totalAmount}`,
+                { align: 'right' },
+            );
+
+            doc.moveDown(2);
+            doc.fontSize(9).fillColor('#999').text('Thank you for shopping with ShopNest!', { align: 'center' });
+
+            doc.end();
+        });
     }
 }

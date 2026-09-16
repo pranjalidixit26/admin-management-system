@@ -261,7 +261,10 @@ export default function Cart() {
             <span className="home-logo-text">ShopNest</span>
           </span>
         </Link>
-        <Link to="/" className="home-nav-login">Continue Shopping</Link>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <Link to="/orders" className="home-nav-login">My Orders</Link>
+          <Link to="/" className="home-nav-login">Continue Shopping</Link>
+        </div>
       </nav>
 
       <main className="home-main" style={{ maxWidth: 1000, margin: '0 auto', width: '100%' }}>
