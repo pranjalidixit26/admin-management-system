@@ -234,6 +234,7 @@ export default function Home() {
       ),
     },
     { type: 'divider' },
+    { key: 'account', label: 'My Account', onClick: () => navigate('/account') },
     { key: 'logout', label: 'Logout', onClick: handleLogout },
   ];
 

@@ -12,6 +12,7 @@ import { ProductsModule } from './products/products.module';
 import { CustomersModule } from './customers/customers.module';
 import { CustomerAuthModule } from './customer-auth/customer-auth.module';
 import { CartModule } from './cart/cart.module';
+import { AddressesModule } from './addresses/addresses.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { CartModule } from './cart/cart.module';
     CustomersModule,
     CustomerAuthModule,
     CartModule,
+    AddressesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

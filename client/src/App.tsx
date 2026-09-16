@@ -13,6 +13,7 @@ import CategoriesPage from './pages/Categories/CategoriesPage';
 import ProductsPage from './pages/Products/ProductsPage';
 import CustomerLogin from './pages/CustomerLogin';
 import Cart from './pages/Cart';
+import CustomerProfile from './pages/CustomerProfile';
 
 function App() {
     return (
@@ -27,6 +28,7 @@ function App() {
 
         <Route path="/customer-login" element={<CustomerLogin />} />
         <Route path="/cart" element={<Cart />} />
+        <Route path="/account" element={<CustomerProfile />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
