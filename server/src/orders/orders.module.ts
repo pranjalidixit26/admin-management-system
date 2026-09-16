@@ -16,5 +16,6 @@ import { CustomerAuthModule } from '../customer-auth/customer-auth.module';
     ],
     controllers: [OrdersController],
     providers: [OrdersService],
+    exports: [OrdersService],
 })
 export class OrdersModule {}

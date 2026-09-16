@@ -14,6 +14,7 @@ import ProductsPage from './pages/Products/ProductsPage';
 import CustomerLogin from './pages/CustomerLogin';
 import Cart from './pages/Cart';
 import CustomerProfile from './pages/CustomerProfile';
+import OrderConfirmation from './pages/OrderConfirmation';
 
 function App() {
     return (
@@ -29,6 +30,7 @@ function App() {
         <Route path="/customer-login" element={<CustomerLogin />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/account" element={<CustomerProfile />} />
+        <Route path="/order-confirmation/:id" element={<OrderConfirmation />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>

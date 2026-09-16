@@ -1,10 +1,17 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Empty, message, Spin, Modal, Tag } from 'antd';
+import { Link, useNavigate } from 'react-router-dom';
+import { Empty, message, Spin, Modal, Tag, Radio } from 'antd';
 import axios from 'axios';
+import customerApi from '../api/customerAxios';
 import { useCart } from '../context/CartContext';
 import NetworkBackground from '../components/NetworkBackground';
 import './Home.css';
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 interface ProductVariantDetail {
   id: number;
@@ -24,8 +31,89 @@ interface ProductDetail {
   variants: ProductVariantDetail[];
 }
 
+interface Address {
+  id: number;
+  label: string | null;
+  addressLine: string;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  phone: string;
+  isDefault: boolean;
+}
+
 export default function Cart() {
-  const { items, updateQty, removeFromCart, addToCart, totalPrice, totalItems, loading } = useCart();
+  const { items, updateQty, removeFromCart, addToCart, totalPrice, totalItems, loading, refreshCart } = useCart();
+  const navigate = useNavigate();
+
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [addressesLoading, setAddressesLoading] = useState(false);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+  const [placingOrder, setPlacingOrder] = useState(false);
+
+  const openCheckout = () => {
+    setCheckoutOpen(true);
+    setAddressesLoading(true);
+    customerApi
+      .get('/addresses')
+      .then((res) => {
+        setAddresses(res.data);
+        const def = res.data.find((a: Address) => a.isDefault);
+        setSelectedAddressId(def ? def.id : res.data[0]?.id ?? null);
+      })
+      .catch(() => message.error('Could not load addresses'))
+      .finally(() => setAddressesLoading(false));
+  };
+
+  const handlePlaceOrder = async () => {
+    if (!selectedAddressId) return;
+    setPlacingOrder(true);
+    try {
+      const { data: rpOrder } = await customerApi.post('/payments/create-order', {
+        amount: totalPrice,
+      });
+
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: rpOrder.amount,
+        currency: rpOrder.currency,
+        name: 'ShopNest',
+        description: 'Order Payment',
+        order_id: rpOrder.id,
+        handler: async (response: any) => {
+          try {
+            const res = await customerApi.post('/payments/verify', {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              addressId: selectedAddressId,
+            });
+            await refreshCart();
+            setCheckoutOpen(false);
+            navigate(`/order-confirmation/${res.data.id}`);
+          } catch {
+            message.error('Payment verified but order failed — contact support');
+          } finally {
+            setPlacingOrder(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setPlacingOrder(false);
+          },
+        },
+        theme: { color: '#4C6FFF' },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch {
+      message.error('Could not start payment — please try again');
+      setPlacingOrder(false);
+    }
+  };
 
   const [modalProduct, setModalProduct] = useState<ProductDetail | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
@@ -389,6 +477,7 @@ export default function Cart() {
               <button
                 className="home-add-to-cart"
                 style={{ width: '100%', padding: '10px 0', fontSize: 15 }}
+                onClick={openCheckout}
               >
                 Proceed to Checkout
               </button>
@@ -573,6 +662,71 @@ export default function Cart() {
             </div>
           </div>
         ) : null}
+      </Modal>
+
+      <Modal
+        title="Select Delivery Address"
+        open={checkoutOpen}
+        onCancel={() => setCheckoutOpen(false)}
+        footer={null}
+        centered
+      >
+        {addressesLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+            <Spin />
+          </div>
+        ) : addresses.length === 0 ? (
+          <Empty description="No saved addresses">
+            <Link to="/account" className="home-nav-login">Add an Address</Link>
+          </Empty>
+        ) : (
+          <>
+            <Radio.Group
+              value={selectedAddressId}
+              onChange={(e) => setSelectedAddressId(e.target.value)}
+              style={{ width: '100%' }}
+            >
+              {addresses.map((addr) => (
+                <div
+                  key={addr.id}
+                  style={{
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 8,
+                    padding: 12,
+                    marginBottom: 10,
+                  }}
+                >
+                  <Radio value={addr.id} style={{ width: '100%' }}>
+                    <div>
+                      <strong>{addr.label || 'Address'}</strong>
+                      {addr.isDefault && (
+                        <Tag color="blue" style={{ marginLeft: 8 }}>Default</Tag>
+                      )}
+                      <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
+                        {addr.addressLine}, {addr.city}, {addr.state} {addr.pincode}
+                      </div>
+                      <div style={{ fontSize: 13, color: '#6b7280' }}>Phone: {addr.phone}</div>
+                    </div>
+                  </Radio>
+                </div>
+              ))}
+            </Radio.Group>
+            <button
+              className="home-add-to-cart"
+              disabled={!selectedAddressId || placingOrder}
+              onClick={handlePlaceOrder}
+              style={{
+                width: '100%',
+                marginTop: 12,
+                padding: '10px 0',
+                fontSize: 15,
+                ...(placingOrder ? { opacity: 0.6, cursor: 'not-allowed' } : {}),
+              }}
+            >
+              {placingOrder ? 'Placing Order...' : 'Place Order'}
+            </button>
+          </>
+        )}
       </Modal>
     </div>
   );

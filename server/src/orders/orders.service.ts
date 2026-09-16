@@ -21,7 +21,7 @@ export class OrdersService {
         private dataSource: DataSource,
     ) {}
 
-    async createFromCart(customerId: number, addressId: number) {
+    async createFromCart(customerId: number, addressId: number, status: OrderStatus = OrderStatus.PENDING) {
         const address = await this.addressRepo.findOne({ where: { id: addressId } });
         if (!address) throw new NotFoundException('Address not found');
         if (address.customerId !== customerId) throw new ForbiddenException();
@@ -59,7 +59,7 @@ export class OrdersService {
                 country: address.country,
                 phone: address.phone,
                 totalAmount,
-                status: OrderStatus.PENDING,
+                status,
             });
             await manager.save(order);
 
