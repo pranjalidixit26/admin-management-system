@@ -133,7 +133,7 @@ export default function CustomerLogin() {
               textDecoration: 'none',
             }}
           >
-            Our Store
+            ShopNest
           </Link>
           <span style={{ fontSize: 13, color: '#8c8c8c', marginTop: 4 }}>
             Sign in to start shopping
