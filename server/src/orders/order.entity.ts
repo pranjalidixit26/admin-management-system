@@ -56,6 +56,12 @@ export class Order {
     @Column('decimal', { precision: 10, scale: 2 })
     totalAmount: number;
 
+    @Column({ type: 'varchar', length: 100, nullable: true, unique: true })
+    razorpayOrderId: string | null;
+
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    razorpayPaymentId: string | null;
+
     @Column({ type: 'enum', enum: OrderStatus, default: OrderStatus.PENDING })
     status: OrderStatus;
 

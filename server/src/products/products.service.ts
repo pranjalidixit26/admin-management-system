@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, In } from 'typeorm';
 import { Product } from './entities/product.entity';
@@ -8,6 +8,8 @@ import { Category } from '../categories/entities/category.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { VariantDto } from './dto/variant.dto';
+import Redis from 'ioredis';
+import { REDIS_CLIENT } from '../redis/redis.module';
 
 @Injectable()
 export class ProductsService {
@@ -20,6 +22,8 @@ export class ProductsService {
     private readonly productVariantImageRepository: Repository<ProductVariantImage>,
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
+    @Inject(REDIS_CLIENT)
+    private readonly redis: Redis,
   ) {}
 
   async create(createProductDto: CreateProductDto): Promise<Product> {
@@ -166,6 +170,14 @@ export class ProductsService {
   }
 
   async getPublicFilters(categoryId?: number): Promise<Record<string, string[]>> {
+    const cacheKey = `filters:${categoryId ?? 'all'}`;
+
+    // Cache HIT — return cached data, skip the DB entirely
+    const cached = await this.redis.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+
     const where: any = { status: true };
 
     if (categoryId) {
@@ -203,6 +215,9 @@ export class ProductsService {
     for (const [key, values] of filterMap.entries()) {
       result[key] = Array.from(values).sort();
     }
+
+    // Cache MISS path — store for next time, expires in 5 minutes (300 seconds)
+    await this.redis.set(cacheKey, JSON.stringify(result), 'EX', 300);
 
     return result;
   }

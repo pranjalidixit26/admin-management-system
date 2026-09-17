@@ -13,11 +13,15 @@ export class PaymentsService {
 
   constructor(private ordersService: OrdersService) {}
 
-  async createOrder(amount: number) {
+  async createOrder(amount: number, customerId: number, addressId: number) {
     const order = await this.razorpay.orders.create({
       amount: Math.round(amount * 100),
       currency: 'INR',
       receipt: `rcpt_${Date.now()}`,
+      notes: {
+        customerId: String(customerId),
+        addressId: String(addressId),
+      },
     });
     return order; // has order.id
   }
@@ -39,6 +43,40 @@ export class PaymentsService {
       throw new BadRequestException('Payment verification failed');
     }
 
-    return this.ordersService.createFromCart(customerId, addressId, OrderStatus.CONFIRMED);
+    return this.ordersService.createFromCart(
+      customerId,
+      addressId,
+      OrderStatus.CONFIRMED,
+      razorpay_order_id,
+      razorpay_payment_id,
+    );
+  }
+
+  verifyWebhookSignature(rawBody: Buffer, signature: string): boolean {
+    const expected = crypto
+      .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET as string)
+      .update(rawBody)
+      .digest('hex');
+    return expected === signature;
+  }
+
+  async handleWebhookEvent(event: any) {
+    if (event.event !== 'payment.captured') return; // ignore other events
+
+    const payment = event.payload.payment.entity;
+    const notes = payment.notes || {};
+    const customerId = Number(notes.customerId);
+    const addressId = Number(notes.addressId);
+
+    if (!customerId || !addressId) return; // can't process without these
+
+    return this.ordersService.createFromCart(
+      customerId,
+      addressId,
+      OrderStatus.CONFIRMED,
+      payment.order_id,
+      payment.id,
+    );
   }
 }
+//5267 3181 8797 5449

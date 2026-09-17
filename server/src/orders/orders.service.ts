@@ -22,7 +22,22 @@ export class OrdersService {
         private dataSource: DataSource,
     ) {}
 
-    async createFromCart(customerId: number, addressId: number, status: OrderStatus = OrderStatus.PENDING) {
+        async createFromCart(
+        customerId: number,
+        addressId: number,
+        status: OrderStatus = OrderStatus.PENDING,
+        razorpayOrderId?: string,
+        razorpayPaymentId?: string,
+    ) {
+        // Idempotency: if this razorpay order already created an order, return it as-is
+        if (razorpayOrderId) {
+            const existing = await this.orderRepo.findOne({
+                where: { razorpayOrderId },
+                relations: { items: true },
+            });
+            if (existing) return existing;
+        }
+
         const address = await this.addressRepo.findOne({ where: { id: addressId } });
         if (!address) throw new NotFoundException('Address not found');
         if (address.customerId !== customerId) throw new ForbiddenException();
@@ -51,7 +66,7 @@ export class OrdersService {
                 return sum + Number(price) * item.quantity;
             }, 0);
 
-            const order = manager.create(Order, {
+                        const order = manager.create(Order, {
                 customerId,
                 addressLine: address.addressLine,
                 city: address.city,
@@ -61,6 +76,8 @@ export class OrdersService {
                 phone: address.phone,
                 totalAmount,
                 status,
+                razorpayOrderId: razorpayOrderId ?? null,
+                razorpayPaymentId: razorpayPaymentId ?? null,
             });
             await manager.save(order);
 

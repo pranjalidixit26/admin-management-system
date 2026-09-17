@@ -1,17 +1,18 @@
-import { Controller, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Req, BadRequestException } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CustomerJwtAuthGuard } from '../customer-auth/customer-jwt-auth.guard'; // adjust to your actual guard
 
 @Controller('payments')
-@UseGuards(CustomerJwtAuthGuard)
 export class PaymentsController {
   constructor(private paymentsService: PaymentsService) {}
 
+  @UseGuards(CustomerJwtAuthGuard)
   @Post('create-order')
-  createOrder(@Body('amount') amount: number) {
-    return this.paymentsService.createOrder(amount);
+  createOrder(@Body() body: { amount: number; addressId: number }, @Req() req: any) {
+    return this.paymentsService.createOrder(body.amount, req.user.customerId, body.addressId);
   }
 
+  @UseGuards(CustomerJwtAuthGuard)
   @Post('verify')
   verify(@Body() body: any, @Req() req: any) {
     const customerId = req.user.customerId;
@@ -22,5 +23,18 @@ export class PaymentsController {
       body.addressId,
       customerId,
     );
+  }
+
+  @Post('webhook')
+  async webhook(@Req() req: any) {
+    const signature = req.headers['x-razorpay-signature'];
+    const rawBody: Buffer = req.body; // raw Buffer, thanks to express.raw() in main.ts
+    const isValid = this.paymentsService.verifyWebhookSignature(rawBody, signature);
+    if (!isValid) {
+      throw new BadRequestException('Invalid webhook signature');
+    }
+    const event = JSON.parse(rawBody.toString('utf8'));
+    await this.paymentsService.handleWebhookEvent(event);
+    return { status: 'ok' };
   }
 }
