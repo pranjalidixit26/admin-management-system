@@ -16,6 +16,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: 'https://admin-management-system-psi.vercel.app',
+    credentials: true,
   });
 
   app.useGlobalPipes(
