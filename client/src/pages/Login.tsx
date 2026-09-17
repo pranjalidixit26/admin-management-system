@@ -28,7 +28,7 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      const response = await axios.post('http://localhost:3000/auth/login', values);
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/auth/login`, values);
       localStorage.setItem('access_token', response.data.access_token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       localStorage.setItem('permissions', JSON.stringify(response.data.permissions ?? []));
@@ -45,7 +45,7 @@ export default function Login() {
     setSignupSuccess(false);
     setSubmitting(true);
     try {
-      await axios.post('http://localhost:3000/users', values);
+      await axios.post(`${import.meta.env.VITE_API_URL}/users`, values);
       setSignupSuccess(true);
       setMode('login');
     } catch {

@@ -31,7 +31,7 @@ export default function CustomerLogin() {
     setError('');
     setSubmitting(true);
     try {
-      const response = await axios.post('http://localhost:3000/customer-auth/login', values);
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/customer-auth/login`, values);
       localStorage.setItem('customer_access_token', response.data.access_token);
       localStorage.setItem('customer', JSON.stringify(response.data.customer));
       await refreshCart();
@@ -48,7 +48,7 @@ export default function CustomerLogin() {
     setSignupSuccess(false);
     setSubmitting(true);
     try {
-      await axios.post('http://localhost:3000/customer-auth/signup', values);
+      await axios.post(`${import.meta.env.VITE_API_URL}/customer-auth/signup`, values);
       setSignupSuccess(true);
       setMode('login');
     } catch (err: any) {

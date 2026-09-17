@@ -76,7 +76,7 @@ export default function Home() {
 
   useEffect(() => {
     axios
-      .get('http://localhost:3000/categories/tree')
+      .get(`${import.meta.env.VITE_API_URL}/categories/tree`)
       .then((res) => setCategoryTree(res.data))
       .catch(() => setCategoryTree([]));
   }, []);
@@ -115,7 +115,7 @@ export default function Home() {
     }
 
     axios
-      .get('http://localhost:3000/products/public', { params })
+      .get(`${import.meta.env.VITE_API_URL}/products/public`, { params })
       .then((res) => setProducts(res.data.data))
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
@@ -244,7 +244,7 @@ export default function Home() {
     if (selectedCategoryId) params.categoryId = selectedCategoryId;
 
     axios
-      .get('http://localhost:3000/products/public/filters', { params })
+      .get(`${import.meta.env.VITE_API_URL}/products/public/filters`, { params })
       .then((res) => setFilters(res.data))
       .catch(() => setFilters({}));
 

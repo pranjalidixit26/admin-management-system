@@ -133,7 +133,7 @@ export default function Cart() {
     setOriginalVariantId(variantId);
     setOriginalQty(qty);
     try {
-      const res = await axios.get(`http://localhost:3000/products/public/${productId}`);
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/products/public/${productId}`);
       const product: ProductDetail = res.data;
       setModalProduct(product);
       const current = product.variants.find((v) => v.id === variantId);
