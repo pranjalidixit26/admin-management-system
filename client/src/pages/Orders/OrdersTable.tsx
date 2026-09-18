@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Table, Input, Tag, Select, message, Modal, Descriptions, Typography, Space, Button, Divider, DatePicker } from 'antd';
 import { Dayjs } from 'dayjs';
-import { EyeOutlined, DownloadOutlined } from '@ant-design/icons';
+import { EyeOutlined, DownloadOutlined, FileExcelOutlined } from '@ant-design/icons';
 import api from '../../api/axios';
 import { hasPermission } from '../../utils/permissions';
 
@@ -165,6 +165,29 @@ export default function OrdersTable({ refreshKey, onStatusChanged }: OrdersTable
     }
     };
 
+  const [exportingCsv, setExportingCsv] = useState(false);
+
+  const handleExportCsv = async () => {
+    setExportingCsv(true);
+    try {
+      const res = await api.get('/orders/admin/export/csv', {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `orders-export-${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error(err);
+      message.error('Could not export orders');
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
   const handleBulkUpdate = async () => {
     if (!bulkStatus || selectedRowKeys.length === 0) return;
     setBulkUpdating(true);
@@ -327,6 +350,13 @@ export default function OrdersTable({ refreshKey, onStatusChanged }: OrdersTable
           }}
           format="DD MMM YYYY"
         />
+        <Button
+          icon={<FileExcelOutlined />}
+          loading={exportingCsv}
+          onClick={handleExportCsv}
+        >
+          Export CSV
+        </Button>
       </div>
 
       {selectedRowKeys.length > 0 && (

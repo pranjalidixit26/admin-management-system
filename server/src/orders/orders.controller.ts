@@ -16,12 +16,24 @@ export class OrdersController {
 
     @Get()
     findAll(@Req() req: any) {
-        return this.ordersService.findAllForCustomer(req.user.customerId);
+    return this.ordersService.findAllForCustomer(req.user.customerId);
+    }
+
+    @Get('admin/export/csv')
+    async exportOrdersCsv(@Res() res: Response) {
+    const csv = await this.ordersService.exportAllForAdmin();
+
+    res.set({
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="orders.csv"',
+    });
+
+    res.send(csv);
     }
 
     @Get(':id')
     findOne(@Req() req: any, @Param('id') id: string) {
-        return this.ordersService.findOne(req.user.customerId, +id);
+    return this.ordersService.findOne(req.user.customerId, +id);
     }
 
     @Post(':id/cancel')
