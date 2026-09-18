@@ -15,9 +15,12 @@ async function bootstrap() {
   app.use(express.urlencoded({ extended: true }));
 
   app.enableCors({
-    origin: 'https://admin-management-system-psi.vercel.app',
+    origin: [
+        'https://admin-management-system-psi.vercel.app',
+        'http://localhost:5173',
+    ],
     credentials: true,
-  });
+});
 
   app.useGlobalPipes(
     new ValidationPipe({
