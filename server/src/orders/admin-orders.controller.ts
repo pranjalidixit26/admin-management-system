@@ -6,6 +6,8 @@ import { RequirePermission } from '../auth/require-permission.decorator';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { BulkUpdateOrderStatusDto } from './dto/bulk-update-order-status.dto';
 import { OrderStatus } from './order.entity';
+import { Controller, Get, Patch, Param, Query, Body, UseGuards, Res } from '@nestjs/common';
+import type { Response } from 'express';
 
 @Controller('orders/admin')
 export class AdminOrdersController {
@@ -52,6 +54,19 @@ export class AdminOrdersController {
     findOne(@Param('id') id: string) {
         return this.ordersService.findOneForAdmin(+id);
     }
+
+    @Get(':id/invoice')
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission('ORDER_VIEW')
+async downloadInvoice(@Param('id') id: string, @Res() res: Response) {
+    const pdfBuffer = await this.ordersService.generateInvoicePdfForAdmin(+id);
+    res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename=invoice-order-${id}.pdf`,
+        'Content-Length': pdfBuffer.length,
+    });
+    res.send(pdfBuffer);
+}
 
     @Patch(':id/status')
     @UseGuards(JwtAuthGuard, PermissionGuard)
