@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Table, Input, Tag, Select, message, Modal, Descriptions, Typography, Space, Button, Divider, DatePicker } from 'antd';
 import { Dayjs } from 'dayjs';
-import { EyeOutlined } from '@ant-design/icons';
+import { EyeOutlined, DownloadOutlined } from '@ant-design/icons';
 import api from '../../api/axios';
 import { hasPermission } from '../../utils/permissions';
 
@@ -146,6 +146,24 @@ export default function OrdersTable({ refreshKey, onStatusChanged }: OrdersTable
       setUpdatingId(null);
     }
   };
+
+  const handleDownloadInvoice = async (orderId: number) => {
+    try {
+        const res = await api.get(`/orders/admin/${orderId}/invoice`, {
+        responseType: 'blob',
+        });
+        const url = window.URL.createObjectURL(new Blob([res.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `invoice-order-${orderId}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    } catch (err) {
+        console.error(err);
+        message.error('Could not download invoice');
+    }
+    };
 
   const handleBulkUpdate = async () => {
     if (!bulkStatus || selectedRowKeys.length === 0) return;
@@ -465,6 +483,15 @@ export default function OrdersTable({ refreshKey, onStatusChanged }: OrdersTable
                 </Text>
               </div>
             </div>
+
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={() => handleDownloadInvoice(selectedOrder.id)}
+              style={{ marginTop: 12 }}
+              block
+            >
+              Download Invoice
+            </Button>
           </Space>
         )}
       </Modal>
