@@ -23,6 +23,7 @@ interface OrderDetailData {
   id: number;
   totalAmount: number;
   status: string;
+  razorpayPaymentId?: string | null;
   addressLine: string;
   city: string;
   state: string;
@@ -161,6 +162,12 @@ export default function OrderDetail() {
                 <Tag color={statusColor[order.status] || 'default'} style={{ fontSize: 15, padding: '6px 16px' }}>
                   {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                 </Tag>
+                <Tag
+                  color={order.razorpayPaymentId ? 'green' : 'orange'}
+                  style={{ fontSize: 15, padding: '6px 16px' }}
+                >
+                  {order.razorpayPaymentId ? 'Paid' : 'Payment Pending'}
+                </Tag>
                 <button
                   onClick={handleReorder}
                   disabled={reordering}
@@ -238,11 +245,13 @@ export default function OrderDetail() {
             {order.status !== 'cancelled' && (
               <div style={{ padding: '32px 48px', borderBottom: '1px solid #f3f4f6' }}>
                 {(() => {
-                  const steps = ['pending', 'confirmed'];
-                  const stepLabels: Record<string, string> = {
+                  const steps = ['pending', 'confirmed', 'shipped', 'delivered'];
+                    const stepLabels: Record<string, string> = {
                     pending: 'Order Placed',
                     confirmed: 'Confirmed',
-                  };
+                    shipped: 'Shipped',
+                    delivered: 'Delivered',
+                    };
                   const currentIndex = steps.indexOf(order.status);
                   return (
                     <div style={{ display: 'flex', alignItems: 'center' }}>

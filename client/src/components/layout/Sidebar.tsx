@@ -8,6 +8,7 @@ const navItems = [
   { label: 'Permissions', path: '/permissions' },
   { label: 'Categories', path: '/categories' },
   { label: 'Products', path: '/products' },
+  { label: 'Orders', path: '/manage-orders' },
 ];
 
 export default function Sidebar() {

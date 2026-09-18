@@ -17,6 +17,7 @@ import CustomerProfile from './pages/CustomerProfile';
 import OrderConfirmation from './pages/OrderConfirmation';
 import OrderHistory from './pages/OrderHistory';
 import OrderDetail from './pages/OrderDetail';
+import OrdersPage from './pages/Orders/OrdersPage';
 
 function App() {
     return (
@@ -44,6 +45,7 @@ function App() {
             <Route path="permissions" element={<PermissionsPage />} />
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="products" element={<ProductsPage />} />
+            <Route path="manage-orders" element={<OrdersPage />} />
           </Route>
         </Route>
         </Routes>

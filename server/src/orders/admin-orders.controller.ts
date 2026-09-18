@@ -18,12 +18,16 @@ export class AdminOrdersController {
         @Query('limit') limit?: string,
         @Query('search') search?: string,
         @Query('status') status?: OrderStatus,
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
     ) {
         return this.ordersService.findAllForAdmin(
             page ? +page : 1,
             limit ? +limit : 10,
             search,
             status,
+            startDate,
+            endDate,
         );
     }
 

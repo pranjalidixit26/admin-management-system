@@ -21,6 +21,7 @@ interface OrderSummary {
   id: number;
   totalAmount: number;
   status: string;
+  razorpayPaymentId: string | null;
   addressLine: string;
   city: string;
   state: string;
@@ -37,7 +38,7 @@ const statusColor: Record<string, string> = {
   cancelled: 'red',
 };
 
-const statusTabs = ['all', 'pending', 'confirmed', 'cancelled'];
+const statusTabs = ['all', 'pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
 
 export default function OrderHistory() {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
@@ -262,9 +263,20 @@ export default function OrderHistory() {
                     <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase' }}>
                       Order # {order.id}
                     </div>
-                    <Tag color={statusColor[order.status] || 'default'} style={{ marginTop: 4 }}>
-                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                    </Tag>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 4 }}>
+                      {order.razorpayPaymentId ? (
+                        <Tag color="green" style={{ margin: 0 }}>
+                          Paid
+                        </Tag>
+                      ) : (
+                        <Tag color="gold" style={{ margin: 0 }}>
+                          Payment Pending
+                        </Tag>
+                      )}
+                      <Tag color={statusColor[order.status] || 'default'} style={{ margin: 0 }}>
+                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                      </Tag>
+                    </div>
                   </div>
                 </div>
 

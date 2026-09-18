@@ -230,6 +230,8 @@ export class OrdersService {
         limit = 10,
         search?: string,
         status?: OrderStatus,
+        startDate?: string,
+        endDate?: string,
     ) {
         const query = this.orderRepo
             .createQueryBuilder('order')
@@ -241,6 +243,14 @@ export class OrdersService {
 
         if (status) {
             query.andWhere('order.status = :status', { status });
+        }
+
+        if (startDate) {
+            query.andWhere('order.created_at >= :startDate', { startDate: `${startDate} 00:00:00` });
+        }
+
+        if (endDate) {
+            query.andWhere('order.created_at <= :endDate', { endDate: `${endDate} 23:59:59` });
         }
 
         if (search) {
