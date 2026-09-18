@@ -278,7 +278,7 @@ export class OrdersService {
         return { data, total, page, limit };
     }
 
-    async findOneForAdmin(id: number) {
+        async findOneForAdmin(id: number) {
         const order = await this.orderRepo.findOne({
             where: { id },
             relations: { items: true, customer: true },
@@ -287,7 +287,39 @@ export class OrdersService {
         return order;
     }
 
-        async updateStatus(id: number, status: OrderStatus) {
+    async exportAllForAdmin(): Promise<string> {
+        const orders = await this.orderRepo.find({
+            relations: { items: true, customer: true },
+            order: { created_at: 'DESC' },
+        });
+
+        const header = [
+            'Order ID', 'Customer Name', 'Customer Email', 'Status', 'Total',
+            'Date', 'Payment Status', 'Payment ID', 'Address', 'Item Count',
+        ];
+
+        const escape = (val: unknown) => {
+            const str = String(val ?? '');
+            return /[,"\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+        };
+
+        const rows = orders.map((order) => [
+            order.id,
+            order.customer?.name ?? '',
+            order.customer?.email ?? '',
+            order.status,
+            order.totalAmount,
+            new Date(order.created_at).toLocaleDateString('en-IN'),
+            order.razorpayPaymentId ? 'Paid' : 'Payment Pending',
+            order.razorpayPaymentId ?? '',
+            `${order.addressLine}, ${order.city}, ${order.state} ${order.pincode}, ${order.country}`,
+            order.items?.length ?? 0,
+        ]);
+
+        return [header, ...rows].map((row) => row.map(escape).join(',')).join('\n');
+    }
+
+    async updateStatus(id: number, status: OrderStatus) {
         const order = await this.orderRepo.findOne({ where: { id } });
         if (!order) throw new NotFoundException('Order not found');
         order.status = status;
