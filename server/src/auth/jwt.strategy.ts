@@ -19,17 +19,25 @@ export class JwtStrategy extends PassportStrategy(Strategy){
     }
 
     async validate(payload:any){
+    console.log('JWT PAYLOAD:', payload);
+    try {
         const user=await this.userRepository.findOne({
             where:{id:payload.sub},
             relations:{roles:{permissions:true}},
         });
+        console.log('USER FOUND:', user);
 
         const permissionCodes=Array.from(
             new Set(
                 (user?.roles??[]).flatMap(role=>(role.permissions??[]).map(p=>p.code))
             )
         );
+        console.log('PERMISSIONS:', permissionCodes);
 
         return {userId:payload.sub, email:payload.email, permissions:permissionCodes};
+    } catch (err) {
+        console.error('VALIDATE ERROR:', err);
+        throw err;
     }
+}
 }

@@ -7,6 +7,7 @@ import { Cart } from '../cart/entities/cart.entity';
 import { CartItem } from '../cart/entities/cart-item.entity';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
+import { AdminOrdersController } from './admin-orders.controller';
 import { CustomerAuthModule } from '../customer-auth/customer-auth.module';
 
 @Module({
@@ -14,7 +15,7 @@ import { CustomerAuthModule } from '../customer-auth/customer-auth.module';
         TypeOrmModule.forFeature([Order, OrderItem, Address, Cart, CartItem]),
         CustomerAuthModule,
     ],
-    controllers: [OrdersController],
+    controllers: [AdminOrdersController, OrdersController], // 👈 order swap kiya
     providers: [OrdersService],
     exports: [OrdersService],
 })

@@ -146,7 +146,7 @@ export class OrdersService {
         return order;
     }
 
-        async generateInvoicePdf(customerId: number, id: number): Promise<Buffer> {
+    async generateInvoicePdf(customerId: number, id: number): Promise<Buffer> {
         const order = await this.orderRepo.findOne({
             where: { id },
             relations: { items: true },
@@ -224,5 +224,49 @@ export class OrdersService {
 
             doc.end();
         });
+    }
+        async findAllForAdmin(
+        page = 1,
+        limit = 10,
+        search?: string,
+        status?: OrderStatus,
+    ) {
+        const query = this.orderRepo
+            .createQueryBuilder('order')
+            .leftJoinAndSelect('order.items', 'items')
+            .leftJoinAndSelect('order.customer', 'customer')
+            .orderBy('order.created_at', 'DESC')
+            .skip((page - 1) * limit)
+            .take(limit);
+
+        if (status) {
+            query.andWhere('order.status = :status', { status });
+        }
+
+        if (search) {
+            query.andWhere(
+                '(customer.name LIKE :search OR customer.email LIKE :search OR CAST(order.id AS CHAR) LIKE :search)',
+                { search: `%${search}%` },
+            );
+        }
+
+        const [data, total] = await query.getManyAndCount();
+        return { data, total, page, limit };
+    }
+
+    async findOneForAdmin(id: number) {
+        const order = await this.orderRepo.findOne({
+            where: { id },
+            relations: { items: true, customer: true },
+        });
+        if (!order) throw new NotFoundException('Order not found');
+        return order;
+    }
+
+    async updateStatus(id: number, status: OrderStatus) {
+        const order = await this.orderRepo.findOne({ where: { id } });
+        if (!order) throw new NotFoundException('Order not found');
+        order.status = status;
+        return this.orderRepo.save(order);
     }
 }

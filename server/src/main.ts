@@ -6,6 +6,7 @@ import { Reflector } from '@nestjs/core';
 import * as express from 'express';
 
 async function bootstrap() {
+  console.log('!!!!! FILE CHANGED - RESTART TEST !!!!!');
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 
   // Webhook route needs the exact raw bytes to verify Razorpay's signature.
