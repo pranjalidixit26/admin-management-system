@@ -76,6 +76,9 @@ export default function OrdersTable({ refreshKey, onStatusChanged }: OrdersTable
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [bulkStatus, setBulkStatus] = useState<string | undefined>(undefined);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
   const limit = 10;
 
   const [detailsVisible, setDetailsVisible] = useState(false);
@@ -141,6 +144,26 @@ export default function OrdersTable({ refreshKey, onStatusChanged }: OrdersTable
       message.error('Failed to update order status');
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleBulkUpdate = async () => {
+    if (!bulkStatus || selectedRowKeys.length === 0) return;
+    setBulkUpdating(true);
+    try {
+      await api.patch('/orders/admin/bulk-status', {
+        orderIds: selectedRowKeys,
+        status: bulkStatus,
+      });
+      message.success(`${selectedRowKeys.length} order(s) marked as ${bulkStatus}`);
+      setSelectedRowKeys([]);
+      setBulkStatus(undefined);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      message.error('Failed to update selected orders');
+    } finally {
+      setBulkUpdating(false);
     }
   };
 
@@ -288,6 +311,41 @@ export default function OrdersTable({ refreshKey, onStatusChanged }: OrdersTable
         />
       </div>
 
+      {selectedRowKeys.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            marginBottom: 16,
+            padding: '10px 16px',
+            background: '#eef2ff',
+            borderRadius: 8,
+          }}
+        >
+          <Text>{selectedRowKeys.length} order(s) selected</Text>
+          <Select
+            placeholder="Mark selected as..."
+            style={{ width: 180 }}
+            value={bulkStatus}
+            onChange={setBulkStatus}
+            options={ORDER_STATUS_OPTIONS.map((s) => ({
+              value: s,
+              label: s.charAt(0).toUpperCase() + s.slice(1),
+            }))}
+          />
+          <Button
+            type="primary"
+            loading={bulkUpdating}
+            disabled={!bulkStatus}
+            onClick={handleBulkUpdate}
+          >
+            Apply
+          </Button>
+          <Button onClick={() => setSelectedRowKeys([])}>Clear</Button>
+        </div>
+      )}
+
       <Table
         columns={columns}
         dataSource={orders}
@@ -295,6 +353,10 @@ export default function OrdersTable({ refreshKey, onStatusChanged }: OrdersTable
         loading={loading}
         bordered
         size="middle"
+        rowSelection={{
+          selectedRowKeys,
+          onChange: setSelectedRowKeys,
+        }}
         pagination={{
           current: page,
           pageSize: limit,

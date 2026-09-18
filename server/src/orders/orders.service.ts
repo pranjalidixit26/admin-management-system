@@ -273,12 +273,24 @@ export class OrdersService {
         return order;
     }
 
-    async updateStatus(id: number, status: OrderStatus) {
+        async updateStatus(id: number, status: OrderStatus) {
         const order = await this.orderRepo.findOne({ where: { id } });
         if (!order) throw new NotFoundException('Order not found');
         order.status = status;
         return this.orderRepo.save(order);
     }
+
+    async bulkUpdateStatus(orderIds: number[], status: OrderStatus) {
+        const result = await this.orderRepo
+            .createQueryBuilder()
+            .update(Order)
+            .set({ status })
+            .whereInIds(orderIds)
+            .execute();
+
+        return { updated: result.affected ?? 0 };
+    }
+
 
         async getStatsForAdmin() {
         const result = await this.orderRepo

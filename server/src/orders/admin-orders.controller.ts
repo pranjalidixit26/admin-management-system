@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { BulkUpdateOrderStatusDto } from './dto/bulk-update-order-status.dto';
 import { OrderStatus } from './order.entity';
 
 @Controller('orders/admin')
@@ -31,11 +32,18 @@ export class AdminOrdersController {
         );
     }
 
-    @Get('stats')
+        @Get('stats')
     @UseGuards(JwtAuthGuard, PermissionGuard)
     @RequirePermission('ORDER_VIEW')
     getStats() {
         return this.ordersService.getStatsForAdmin();
+    }
+
+    @Patch('bulk-status')
+    @UseGuards(JwtAuthGuard, PermissionGuard)
+    @RequirePermission('ORDER_UPDATE_STATUS')
+    bulkUpdateStatus(@Body() dto: BulkUpdateOrderStatusDto) {
+        return this.ordersService.bulkUpdateStatus(dto.orderIds, dto.status);
     }
 
     @Get(':id')
