@@ -279,4 +279,17 @@ export class OrdersService {
         order.status = status;
         return this.orderRepo.save(order);
     }
+
+        async getStatsForAdmin() {
+        const result = await this.orderRepo
+            .createQueryBuilder('order')
+            .select('COUNT(order.id)', 'totalOrders')
+            .addSelect('COALESCE(SUM(order.totalAmount), 0)', 'totalRevenue')
+            .getRawOne();
+
+        return {
+            totalOrders: Number(result.totalOrders),
+            totalRevenue: Number(result.totalRevenue),
+        };
+    }
 }

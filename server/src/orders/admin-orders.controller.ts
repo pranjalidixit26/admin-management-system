@@ -31,6 +31,13 @@ export class AdminOrdersController {
         );
     }
 
+    @Get('stats')
+    @UseGuards(JwtAuthGuard, PermissionGuard)
+    @RequirePermission('ORDER_VIEW')
+    getStats() {
+        return this.ordersService.getStatsForAdmin();
+    }
+
     @Get(':id')
     @UseGuards(JwtAuthGuard, PermissionGuard)
     @RequirePermission('ORDER_VIEW')
