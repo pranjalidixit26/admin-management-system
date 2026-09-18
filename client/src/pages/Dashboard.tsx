@@ -53,6 +53,13 @@ interface ChartDatum {
   count: number;
 }
 
+interface RecentOrder {
+  id: number;
+  totalAmount: number;
+  status: string;
+  customer?: { name: string };
+}
+
 const CHART_COLOR = '#6366f1';
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -66,6 +73,10 @@ export default function Dashboard() {
   const [usersByRole, setUsersByRole] = useState<ChartDatum[]>([]);
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
   const [inventoryValue, setInventoryValue] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [ordersByStatus, setOrdersByStatus] = useState<ChartDatum[]>([]);
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [recentUsers, setRecentUsers] = useState<User[]>([]);
 
@@ -73,11 +84,13 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
       setLoading(true);
       try {
-        const [usersRes, productsRes, categoriesRes, rolesRes] = await Promise.all([
+        const [usersRes, productsRes, categoriesRes, rolesRes, orderStatsRes, recentOrdersRes] = await Promise.all([
           api.get('/users', { params: { page: 1, limit: 1000 } }),
           api.get('/products', { params: { page: 1, limit: 1000 } }),
           api.get('/categories', { params: { page: 1, limit: 1000 } }),
           api.get('/roles', { params: { page: 1, limit: 1000 } }),
+          api.get('/orders/admin/stats'),
+          api.get('/orders/admin', { params: { page: 1, limit: 5 } }),
         ]);
 
         const users: User[] = usersRes.data.data;
@@ -129,6 +142,15 @@ export default function Dashboard() {
           0
         );
         setInventoryValue(totalValue);
+        setTotalRevenue(orderStatsRes.data.totalRevenue ?? 0);
+        setTotalOrders(orderStatsRes.data.totalOrders ?? 0);
+        setOrdersByStatus(
+          (orderStatsRes.data.statusBreakdown ?? []).map((s: { status: string; count: number }) => ({
+            name: s.status.charAt(0).toUpperCase() + s.status.slice(1),
+            count: s.count,
+          }))
+        );
+        setRecentOrders(recentOrdersRes.data.data ?? []);
 
         // Recent activity: last 5 products / users (assumes createdAt exists; falls back to id order)
         const sortByRecency = <T extends { createdAt?: string; id: number }>(items: T[]) =>
@@ -201,73 +223,48 @@ export default function Dashboard() {
         </Row>
 
                 {/* Inventory value + low stock alert */}
-        <Row gutter={[16, 16]} style={{ marginTop: 16, alignItems: 'stretch' }}>
+                <Row gutter={[16, 16]} style={{ marginTop: 16, alignItems: 'stretch' }}>
           <Col xs={24} md={8} style={{ display: 'flex' }}>
-            <Card
-              style={{ ...cardStyle, width: '100%' }}
-              styles={{ body: { padding: 20, height: '100%', display: 'flex', alignItems: 'center' } }}
-            >
+            <Card style={{ ...cardStyle, width: '100%' }} styles={{ body: { padding: 20, height: '100%', display: 'flex', alignItems: 'center' } }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 12,
-                    background: '#10b9811A',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#10b981',
-                    fontSize: 20,
-                    flexShrink: 0,
-                  }}
-                >
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#10b9811A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', fontSize: 20, flexShrink: 0 }}>
                   <WalletOutlined />
                 </div>
-                <Statistic
-                  title="Total Inventory Value"
-                  value={inventoryValue}
-                  precision={2}
-                  prefix="₹"
-                />
+                <Statistic title="Total Inventory Value" value={inventoryValue} precision={2} prefix="₹" />
               </div>
             </Card>
           </Col>
 
-          <Col xs={24} md={16} style={{ display: 'flex' }}>
-            <Card
-              style={{ ...cardStyle, width: '100%' }}
-              styles={{ body: { padding: 20, height: '100%', display: 'flex', alignItems: 'center' } }}
-            >
+          <Col xs={24} md={8} style={{ display: 'flex' }}>
+            <Card style={{ ...cardStyle, width: '100%' }} styles={{ body: { padding: 20, height: '100%', display: 'flex', alignItems: 'center' } }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#6366f11A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6366f1', fontSize: 20, flexShrink: 0 }}>
+                  <ShoppingOutlined />
+                </div>
+                <Statistic title="Total Revenue" value={totalRevenue} precision={2} prefix="₹" />
+              </div>
+            </Card>
+          </Col>
+
+          <Col xs={24} md={8} style={{ display: 'flex' }}>
+            <Card style={{ ...cardStyle, width: '100%' }} styles={{ body: { padding: 20, height: '100%', display: 'flex', alignItems: 'center' } }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f59e0b1A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', fontSize: 20, flexShrink: 0 }}>
+                  <ShoppingOutlined />
+                </div>
+                <Statistic title="Total Orders" value={totalOrders} />
+              </div>
+            </Card>
+          </Col>
+        </Row>
+
+        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+          <Col xs={24}>
+            <Card style={cardStyle} styles={{ body: { padding: 20 } }}>
               {lowStockProducts.length > 0 ? (
-                <Alert
-                  type="warning"
-                  showIcon
-                  icon={<WarningOutlined />}
-                  message={`${lowStockProducts.length} product${lowStockProducts.length > 1 ? 's are' : ' is'} low on stock`}
-                  description={
-                    <Space size={[6, 6]} wrap style={{ marginTop: 6 }}>
-                      {lowStockProducts.map((p) => (
-                        <Tag
-                          key={p.id}
-                          color={p.stock === 0 ? 'red' : 'orange'}
-                          style={{ borderRadius: 12, margin: 0 }}
-                        >
-                          {p.name} ({p.stock === 0 ? 'out of stock' : `${p.stock} left`})
-                        </Tag>
-                      ))}
-                    </Space>
-                  }
-                  style={{ width: '100%' }}
-                />
+                <Alert type="warning" showIcon icon={<WarningOutlined />} message={`${lowStockProducts.length} product${lowStockProducts.length > 1 ? 's are' : ' is'} low on stock`} description={<Space size={[6, 6]} wrap style={{ marginTop: 6 }}>{lowStockProducts.map((p) => (<Tag key={p.id} color={p.stock === 0 ? 'red' : 'orange'} style={{ borderRadius: 12, margin: 0 }}>{p.name} ({p.stock === 0 ? 'out of stock' : `${p.stock} left`})</Tag>))}</Space>} style={{ width: '100%' }} />
               ) : (
-                <Alert
-                  type="success"
-                  showIcon
-                  message="All products are well stocked"
-                  description="No products are currently low on stock."
-                  style={{ width: '100%' }}
-                />
+                <Alert type="success" showIcon message="All products are well stocked" description="No products are currently low on stock." style={{ width: '100%' }} />
               )}
             </Card>
           </Col>
@@ -308,6 +305,48 @@ export default function Dashboard() {
               ) : (
                 <Text type="secondary">No user data yet.</Text>
               )}
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Orders overview */}
+        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+          <Col xs={24} lg={12}>
+            <Card title="Orders by Status" style={cardStyle}>
+              {ordersByStatus.length > 0 ? (
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={ordersByStatus}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <Text type="secondary">No order data yet.</Text>
+              )}
+            </Card>
+          </Col>
+
+          <Col xs={24} lg={12}>
+            <Card title="Recent Orders" style={cardStyle}>
+              <List
+                dataSource={recentOrders}
+                locale={{ emptyText: 'No orders yet' }}
+                renderItem={(o) => (
+                  <List.Item>
+                    <Text strong>#{o.id}</Text>
+                    <Text type="secondary" style={{ marginLeft: 8 }}>
+                      {o.customer?.name ?? '-'}
+                    </Text>
+                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Text>₹{Number(o.totalAmount).toFixed(2)}</Text>
+                      <Tag style={{ margin: 0, textTransform: 'capitalize' }}>{o.status}</Tag>
+                    </div>
+                  </List.Item>
+                )}
+              />
             </Card>
           </Col>
         </Row>

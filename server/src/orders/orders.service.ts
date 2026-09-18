@@ -287,9 +287,20 @@ export class OrdersService {
             .addSelect('COALESCE(SUM(order.totalAmount), 0)', 'totalRevenue')
             .getRawOne();
 
+        const statusRows = await this.orderRepo
+            .createQueryBuilder('order')
+            .select('order.status', 'status')
+            .addSelect('COUNT(order.id)', 'count')
+            .groupBy('order.status')
+            .getRawMany();
+
         return {
             totalOrders: Number(result.totalOrders),
             totalRevenue: Number(result.totalRevenue),
+            statusBreakdown: statusRows.map((r) => ({
+                status: r.status,
+                count: Number(r.count),
+            })),
         };
     }
 }
