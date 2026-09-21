@@ -1,16 +1,32 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, IsNull } from 'typeorm';
+import { Redis } from 'ioredis';
 import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
+const CATEGORY_TREE_KEY = 'categories:tree';
+const CATEGORY_TREE_TTL = 3600; // 1 ghanta, aur har write pe invalidate bhi hota hai
+
 @Injectable()
 export class CategoriesService {
+  private readonly logger = new Logger(CategoriesService.name);
+
   constructor(
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
+
+  // Redis down ho to bhi API chalti rehni chahiye, isliye error sirf log hota hai
+  private async invalidateTreeCache() {
+    try {
+      await this.redis.del(CATEGORY_TREE_KEY);
+    } catch (err) {
+      this.logger.warn(`Could not invalidate ${CATEGORY_TREE_KEY}: ${(err as Error).message}`);
+    }
+  }
 
   /**
    * Validates that a parentId, if provided, points to a valid TOP-LEVEL
@@ -39,7 +55,9 @@ export class CategoriesService {
     await this.validateParent(createCategoryDto.parentId);
 
     const category = this.categoryRepository.create(createCategoryDto);
-    return this.categoryRepository.save(category);
+    const saved = await this.categoryRepository.save(category);
+    await this.invalidateTreeCache();
+    return saved;
   }
 
   async findAll(page = 1, limit = 10, search?: string) {
@@ -66,11 +84,26 @@ export class CategoriesService {
    * tree-style display.
    */
   async findTree(): Promise<Category[]> {
-    return this.categoryRepository.find({
+    try {
+      const cached = await this.redis.get(CATEGORY_TREE_KEY);
+      if (cached) return JSON.parse(cached) as Category[];
+    } catch (err) {
+      this.logger.warn(`Redis read failed: ${(err as Error).message}`);
+    }
+
+    const tree = await this.categoryRepository.find({
       where: { parentId: IsNull() },
       relations: { subcategories: true },
       order: { id: 'ASC' },
     });
+
+    try {
+      await this.redis.set(CATEGORY_TREE_KEY, JSON.stringify(tree), 'EX', CATEGORY_TREE_TTL);
+    } catch (err) {
+      this.logger.warn(`Redis write failed: ${(err as Error).message}`);
+    }
+
+    return tree;
   }
 
   async findOne(id: number): Promise<Category> {
@@ -102,11 +135,14 @@ export class CategoriesService {
     }
 
     Object.assign(category, updateCategoryDto);
-    return this.categoryRepository.save(category);
+    const saved = await this.categoryRepository.save(category);
+    await this.invalidateTreeCache();
+    return saved;
   }
 
   async remove(id: number): Promise<void> {
     const category = await this.findOne(id);
     await this.categoryRepository.remove(category);
+    await this.invalidateTreeCache();
   }
 }
