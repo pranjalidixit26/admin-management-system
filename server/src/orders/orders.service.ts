@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Inject, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import PDFDocument from 'pdfkit';
@@ -8,9 +8,15 @@ import { Address } from '../addresses/address.entity';
 import { Cart } from '../cart/entities/cart.entity';
 import { CartItem } from '../cart/entities/cart-item.entity';
 import { MailService } from '../mail/mail.service';
+import Redis from 'ioredis';
+import { REDIS_CLIENT } from '../redis/redis.module';
+
+const PRODUCTS_VERSION_KEY = 'products:version';
 
 @Injectable()
 export class OrdersService {
+    private readonly logger = new Logger(OrdersService.name);
+
     constructor(
         @InjectRepository(Order)
         private orderRepo: Repository<Order>,
@@ -22,7 +28,18 @@ export class OrdersService {
         private cartItemRepo: Repository<CartItem>,
         private dataSource: DataSource,
         private mailService: MailService,
+        @Inject(REDIS_CLIENT)
+        private readonly redis: Redis,
     ) {}
+
+    // Stock badalta hai to public product list cache purana ho jata hai, isliye version badhao
+    private async bumpProductsCache() {
+        try {
+            await this.redis.incr(PRODUCTS_VERSION_KEY);
+        } catch (err) {
+            this.logger.warn(`Could not bump ${PRODUCTS_VERSION_KEY}: ${(err as Error).message}`);
+        }
+    }
 
         async createFromCart(
         customerId: number,
@@ -62,7 +79,7 @@ export class OrdersService {
             }
         }
 
-        return this.dataSource.transaction(async (manager) => {
+        const created = await this.dataSource.transaction(async (manager) => {
             const totalAmount = cart.items.reduce((sum, item) => {
                 const price = item.variant.price ?? item.variant.product.price;
                 return sum + Number(price) * item.quantity;
@@ -114,6 +131,10 @@ export class OrdersService {
                 relations: { items: true },
             });
         });
+
+        // Transaction commit ho chuka hai, ab stock badal chuka hai, cache invalidate karo
+        await this.bumpProductsCache();
+        return created;
     }
 
     async findAllForCustomer(customerId: number) {

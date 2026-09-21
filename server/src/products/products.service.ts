@@ -14,7 +14,7 @@ import { REDIS_CLIENT } from '../redis/redis.module';
 
 const PRODUCTS_VERSION_KEY = 'products:version';
 const FILTERS_TTL = 3600; 
-const PUBLIC_LIST_TTL = 60; 
+const PUBLIC_LIST_TTL = 3600; 
 
 @Injectable()
 export class ProductsService {
