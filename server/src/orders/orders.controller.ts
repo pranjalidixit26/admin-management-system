@@ -19,17 +19,6 @@ export class OrdersController {
     return this.ordersService.findAllForCustomer(req.user.customerId);
     }
 
-    @Get('admin/export/csv')
-    async exportOrdersCsv(@Res() res: Response) {
-    const csv = await this.ordersService.exportAllForAdmin();
-
-    res.set({
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="orders.csv"',
-    });
-
-    res.send(csv);
-    }
 
     @Get(':id')
     findOne(@Req() req: any, @Param('id') id: string) {
