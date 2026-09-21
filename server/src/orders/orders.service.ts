@@ -12,6 +12,8 @@ import Redis from 'ioredis';
 import { REDIS_CLIENT } from '../redis/redis.module';
 
 const PRODUCTS_VERSION_KEY = 'products:version';
+const ADMIN_STATS_KEY = 'admin:orders:stats';
+const ADMIN_STATS_TTL = 300; 
 
 @Injectable()
 export class OrdersService {
@@ -38,6 +40,15 @@ export class OrdersService {
             await this.redis.incr(PRODUCTS_VERSION_KEY);
         } catch (err) {
             this.logger.warn(`Could not bump ${PRODUCTS_VERSION_KEY}: ${(err as Error).message}`);
+        }
+    }
+
+        // Order banne ya status badalne par dashboard ke numbers purane ho jate hain
+    private async clearAdminStatsCache() {
+        try {
+            await this.redis.del(ADMIN_STATS_KEY);
+        } catch (err) {
+            this.logger.warn(`Could not clear ${ADMIN_STATS_KEY}: ${(err as Error).message}`);
         }
     }
 
@@ -134,6 +145,7 @@ export class OrdersService {
 
         // Transaction commit ho chuka hai, ab stock badal chuka hai, cache invalidate karo
         await this.bumpProductsCache();
+        await this.clearAdminStatsCache();
         return created;
     }
 
@@ -156,7 +168,9 @@ export class OrdersService {
             throw new BadRequestException('Delivered orders cannot be cancelled');
         }
         order.status = OrderStatus.CANCELLED;
-        return this.orderRepo.save(order);
+        const saved = await this.orderRepo.save(order);
+        await this.clearAdminStatsCache();
+        return saved;
     }
 
     async findOne(customerId: number, id: number) {
@@ -351,6 +365,7 @@ export class OrdersService {
         if (order.status === status) return order;
         order.status = status;
         const saved = await this.orderRepo.save(order);
+        await this.clearAdminStatsCache();
         void this.mailService.sendOrderStatusEmails([saved]);
         return saved;
     }
@@ -368,13 +383,21 @@ export class OrdersService {
             .set({ status })
             .whereInIds(orderIds)
             .execute();
-            void this.mailService.sendOrderStatusEmails(changed);
+        await this.clearAdminStatsCache();
+        void this.mailService.sendOrderStatusEmails(changed);
 
         return { updated: result.affected ?? 0 };
     }
 
 
         async getStatsForAdmin() {
+        try {
+            const cached = await this.redis.get(ADMIN_STATS_KEY);
+            if (cached) return JSON.parse(cached);
+        } catch (err) {
+            this.logger.warn(`Could not read ${ADMIN_STATS_KEY}: ${(err as Error).message}`);
+        }
+
         const result = await this.orderRepo
             .createQueryBuilder('order')
             .select('COUNT(order.id)', 'totalOrders')
@@ -388,7 +411,7 @@ export class OrdersService {
             .groupBy('order.status')
             .getRawMany();
 
-        return {
+        const stats = {
             totalOrders: Number(result.totalOrders),
             totalRevenue: Number(result.totalRevenue),
             statusBreakdown: statusRows.map((r) => ({
@@ -396,5 +419,12 @@ export class OrdersService {
                 count: Number(r.count),
             })),
         };
+
+        try {
+            await this.redis.set(ADMIN_STATS_KEY, JSON.stringify(stats), 'EX', ADMIN_STATS_TTL);
+        } catch (err) {
+            this.logger.warn(`Could not write ${ADMIN_STATS_KEY}: ${(err as Error).message}`);
+        }
+        return stats;
     }
 }
