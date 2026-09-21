@@ -67,9 +67,10 @@ export default function ProductsTable({ refreshKey, onEdit }: ProductsTableProps
       await api.delete(`/products/${id}`);
       message.success('Product deleted');
       fetchProducts();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      message.error('Failed to delete product');
+      const msg = err?.response?.data?.message;
+      message.error(Array.isArray(msg) ? msg.join(', ') : msg ?? 'Failed to delete product', 6);
     }
   };
 

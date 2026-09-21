@@ -352,7 +352,20 @@ export class ProductsService {
 
   async remove(id: number): Promise<void> {
     const product = await this.findOne(id);
-    await this.productRepository.remove(product);
+    try {
+      await this.productRepository.remove(product);
+    } catch (err) {
+      const e = err as any;
+      const errno = e?.driverError?.errno ?? e?.errno;
+      const code = e?.driverError?.code ?? e?.code;
+      // Variant ka order_items me reference hai (FK RESTRICT)
+      if (errno === 1451 || code === 'ER_ROW_IS_REFERENCED_2') {
+        throw new ConflictException(
+          'This product has existing orders, so it cannot be deleted. Set it to Inactive instead (Edit, then turn off the Active switch).',
+        );
+      }
+      throw err;
+    }
     await this.bumpCacheVersion();
   }
 
@@ -423,7 +436,7 @@ export class ProductsService {
         const errno = (err as any)?.driverError?.errno ?? (err as any)?.errno;
         if (errno === 1451) {
           throw new ConflictException(
-            'Kisi variant ka order ya cart me use ho chuka hai, isliye delete nahi ho sakta. Stock 0 kar do.',
+            'A variant you removed is part of an existing order, so it cannot be deleted. Keep the variant and set its stock to 0 instead.',
           );
         }
         throw err;
