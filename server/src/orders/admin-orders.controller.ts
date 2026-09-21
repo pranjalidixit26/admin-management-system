@@ -47,6 +47,18 @@ export class AdminOrdersController {
         return this.ordersService.bulkUpdateStatus(dto.orderIds, dto.status);
     }
 
+    @Get('export/csv')
+    @UseGuards(JwtAuthGuard, PermissionGuard)
+    @RequirePermission('ORDER_VIEW')
+    async exportCsv(@Res() res: Response) {
+        const csv = await this.ordersService.exportAllForAdmin();
+        res.set({
+            'Content-Type': 'text/csv',
+            'Content-Disposition': `attachment; filename=orders-export-${Date.now()}.csv`,
+        });
+        res.send(csv);
+    }
+
     @Get(':id')
     @UseGuards(JwtAuthGuard, PermissionGuard)
     @RequirePermission('ORDER_VIEW')
