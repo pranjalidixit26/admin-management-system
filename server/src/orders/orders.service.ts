@@ -1,12 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import PDFDocument from 'pdfkit';
 import { Order, OrderStatus } from './order.entity';
 import { OrderItem } from './order-item.entity';
 import { Address } from '../addresses/address.entity';
 import { Cart } from '../cart/entities/cart.entity';
 import { CartItem } from '../cart/entities/cart-item.entity';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class OrdersService {
@@ -20,6 +21,7 @@ export class OrdersService {
         @InjectRepository(CartItem)
         private cartItemRepo: Repository<CartItem>,
         private dataSource: DataSource,
+        private mailService: MailService,
     ) {}
 
         async createFromCart(
@@ -320,19 +322,32 @@ export class OrdersService {
     }
 
     async updateStatus(id: number, status: OrderStatus) {
-        const order = await this.orderRepo.findOne({ where: { id } });
+        const order = await this.orderRepo.findOne({
+            where: { id },
+            relations: { customer: true, items: true },
+        });
         if (!order) throw new NotFoundException('Order not found');
+        if (order.status === status) return order;
         order.status = status;
-        return this.orderRepo.save(order);
+        const saved = await this.orderRepo.save(order);
+        void this.mailService.sendOrderStatusEmails([saved]);
+        return saved;
     }
 
     async bulkUpdateStatus(orderIds: number[], status: OrderStatus) {
+        const orders = await this.orderRepo.find({
+            where: { id: In(orderIds) },
+            relations: { customer: true, items: true },
+        });
+        const changed = orders.filter((o) => o.status !== status);
+        changed.forEach((o) => (o.status = status));
         const result = await this.orderRepo
             .createQueryBuilder()
             .update(Order)
             .set({ status })
             .whereInIds(orderIds)
             .execute();
+            void this.mailService.sendOrderStatusEmails(changed);
 
         return { updated: result.affected ?? 0 };
     }

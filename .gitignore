@@ -6,3 +6,4 @@ build/
 *.log
 .vscode/
 .DS_Storeserver/tsconfig.build.tsbuildinfo
+*.tsbuildinfo

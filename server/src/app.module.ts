@@ -16,6 +16,7 @@ import { AddressesModule } from './addresses/addresses.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { RedisModule } from './redis/redis.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { RedisModule } from './redis/redis.module';
     OrdersModule,
     PaymentsModule,
     RedisModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],
