@@ -25,6 +25,8 @@ export class CategoriesService {
   private async invalidateTreeCache() {
     try {
       await this.redis.del(CATEGORY_TREE_KEY);
+      // product list/filters me category ka naam aur subcategories aate hain, wo bhi invalidate karo
+      await this.redis.incr('products:version');
     } catch (err) {
       this.logger.warn(`Could not invalidate ${CATEGORY_TREE_KEY}: ${(err as Error).message}`);
     }

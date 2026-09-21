@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, Inject} from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, Logger } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, In } from 'typeorm';
 import { Product } from './entities/product.entity';
@@ -11,8 +12,14 @@ import { VariantDto } from './dto/variant.dto';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from '../redis/redis.module';
 
+const PRODUCTS_VERSION_KEY = 'products:version';
+const FILTERS_TTL = 3600; 
+const PUBLIC_LIST_TTL = 60; 
+
 @Injectable()
 export class ProductsService {
+  private readonly logger = new Logger(ProductsService.name);
+
   constructor(
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
@@ -25,6 +32,42 @@ export class ProductsService {
     @Inject(REDIS_CLIENT)
     private readonly redis: Redis,
   ) {}
+
+  // Version badhne se saari purani products/filters cache keys unreachable ho jaati hain
+  private async getCacheVersion(): Promise<string> {
+    try {
+      return (await this.redis.get(PRODUCTS_VERSION_KEY)) ?? '0';
+    } catch (err) {
+      this.logger.warn(`Redis read failed: ${(err as Error).message}`);
+      return '0';
+    }
+  }
+
+  private async bumpCacheVersion() {
+    try {
+      await this.redis.incr(PRODUCTS_VERSION_KEY);
+    } catch (err) {
+      this.logger.warn(`Could not bump ${PRODUCTS_VERSION_KEY}: ${(err as Error).message}`);
+    }
+  }
+
+  private async getCached(key: string): Promise<any | null> {
+    try {
+      const cached = await this.redis.get(key);
+      return cached ? JSON.parse(cached) : null;
+    } catch (err) {
+      this.logger.warn(`Redis read failed: ${(err as Error).message}`);
+      return null;
+    }
+  }
+
+  private async setCached(key: string, value: unknown, ttl: number) {
+    try {
+      await this.redis.set(key, JSON.stringify(value), 'EX', ttl);
+    } catch (err) {
+      this.logger.warn(`Redis write failed: ${(err as Error).message}`);
+    }
+  }
 
   async create(createProductDto: CreateProductDto): Promise<Product> {
     const { categoryId, variants, ...rest } = createProductDto;
@@ -48,6 +91,7 @@ export class ProductsService {
       await this.productVariantRepository.save(defaultVariant);
     }
 
+    await this.bumpCacheVersion();
     return savedProduct;
   }
 
@@ -91,14 +135,46 @@ export class ProductsService {
     return product;
   }
 
-    async findPublic(
+  async findPublic(
     page = 1,
     limit = 12,
     search?: string,
     categoryId?: number,
     sort?: string,
     attributes?: Record<string, string[]>,
-  ) {
+  ): Promise<{ data: Product[]; total: number; page: number; limit: number; totalPages: number }> {
+    // attributes ko sorted rakho taaki same filter hamesha same key banaye
+    const normalizedAttributes = attributes
+      ? Object.fromEntries(
+          Object.entries(attributes)
+            .filter(([, values]) => values && values.length > 0)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, values]) => [key, [...values].sort()]),
+        )
+      : undefined;
+
+    const hash = createHash('md5')
+      .update(JSON.stringify({ page, limit, search, categoryId, sort, attributes: normalizedAttributes }))
+      .digest('hex');
+    const version = await this.getCacheVersion();
+    const cacheKey = `products:public:v${version}:${hash}`;
+
+    const cached = await this.getCached(cacheKey);
+    if (cached) return cached;
+
+    const result = await this.findPublicFromDb(page, limit, search, categoryId, sort, attributes);
+    await this.setCached(cacheKey, result, PUBLIC_LIST_TTL);
+    return result;
+  }
+
+  private async findPublicFromDb(
+    page = 1,
+    limit = 12,
+    search?: string,
+    categoryId?: number,
+    sort?: string,
+    attributes?: Record<string, string[]>,
+  ): Promise<{ data: Product[]; total: number; page: number; limit: number; totalPages: number }> {
     const qb = this.productRepository
       .createQueryBuilder('product')
       .leftJoin('product.category', 'category')
@@ -170,12 +246,13 @@ export class ProductsService {
   }
 
   async getPublicFilters(categoryId?: number): Promise<Record<string, string[]>> {
-    const cacheKey = `filters:${categoryId ?? 'all'}`;
+    const version = await this.getCacheVersion();
+    const cacheKey = `filters:v${version}:${categoryId ?? 'all'}`;
 
     // Cache HIT — return cached data, skip the DB entirely
-    const cached = await this.redis.get(cacheKey);
+    const cached = await this.getCached(cacheKey);
     if (cached) {
-      return JSON.parse(cached);
+      return cached;
     }
 
     const where: any = { status: true };
@@ -216,8 +293,8 @@ export class ProductsService {
       result[key] = Array.from(values).sort();
     }
 
-    // Cache MISS path — store for next time, expires in 5 minutes (300 seconds)
-    await this.redis.set(cacheKey, JSON.stringify(result), 'EX', 300);
+    // Cache MISS path — 1 ghanta ka TTL, product/variant/category change pe version badhne se invalidate
+    await this.setCached(cacheKey, result, FILTERS_TTL);
 
     return result;
   }
@@ -240,12 +317,14 @@ export class ProductsService {
       }
     }
 
+    await this.bumpCacheVersion();
     return savedProduct;
   }
 
   async remove(id: number): Promise<void> {
     const product = await this.findOne(id);
     await this.productRepository.remove(product);
+    await this.bumpCacheVersion();
   }
 
   private async saveVariants(
