@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal, Form, Input, InputNumber, Select, Switch, Button, Card, Space, Divider, AutoComplete, message } from 'antd';
+import { Modal, Form, Input, InputNumber, Select, Switch, Button, Card, Space, Divider, AutoComplete, Radio, message } from 'antd';
 import { PlusOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
 import api from '../../api/axios';
 
@@ -78,6 +78,7 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel,
   // "Adjust stock" modal ka state (sirf existing variants ke liye)
   const [adjustTarget, setAdjustTarget] = useState<{ variantId: number; fieldName: number } | null>(null);
   const [delta, setDelta] = useState<number | null>(null);
+  const [adjustMode, setAdjustMode] = useState<'change' | 'set'>('change');
   const [adjusting, setAdjusting] = useState(false);
 
   useEffect(() => {
@@ -173,11 +174,21 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel,
     }
   };
 
+  const currentAdjustStock: number =
+    adjustTarget !== null
+      ? form.getFieldValue(['variants', adjustTarget.fieldName, 'stock']) ?? 0
+      : 0;
+  // "set" mode me delta = naya number - abhi ka number
+  const effectiveDelta =
+    delta === null ? 0 : adjustMode === 'set' ? delta - currentAdjustStock : delta;
+
   const handleAdjustStock = async () => {
-    if (!adjustTarget || !delta) return;
+    if (!adjustTarget || !effectiveDelta) return;
     setAdjusting(true);
     try {
-      const res = await api.patch(`/products/variants/${adjustTarget.variantId}/stock`, { delta });
+      const res = await api.patch(`/products/variants/${adjustTarget.variantId}/stock`, {
+        delta: effectiveDelta,
+      });
       form.setFieldValue(['variants', adjustTarget.fieldName, 'stock'], res.data.stock);
       message.success(`Stock updated: ${res.data.stock}`);
       onStockChange?.();
@@ -365,7 +376,7 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel,
         open={!!adjustTarget}
         onOk={handleAdjustStock}
         confirmLoading={adjusting}
-        okButtonProps={{ disabled: !delta }}
+        okButtonProps={{ disabled: delta === null || effectiveDelta === 0 }}
         onCancel={() => {
           setAdjustTarget(null);
           setDelta(null);
@@ -373,7 +384,29 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel,
         okText="Apply"
       >
         <p>Enter a positive number to add stock (e.g. 5) or a negative number to remove it (e.g. -3).</p>
-        <InputNumber precision={0} value={delta} onChange={setDelta} style={{ width: '100%' }} />
+        <Radio.Group
+          value={adjustMode}
+          onChange={(e) => {
+            setAdjustMode(e.target.value);
+            setDelta(null);
+          }}
+          style={{ marginBottom: 12 }}
+        >
+          <Radio.Button value="change">Add / remove</Radio.Button>
+          <Radio.Button value="set">Set to exact number</Radio.Button>
+        </Radio.Group>
+        <p>
+          {adjustMode === 'change'
+            ? 'Enter a positive number to add stock or a negative number to remove it.'
+            : `Current stock is ${currentAdjustStock}. Enter the new total.`}
+        </p>
+        <InputNumber
+          precision={0}
+          min={adjustMode === 'set' ? 0 : undefined}
+          value={delta}
+          onChange={setDelta}
+          style={{ width: '100%' }}
+        />
       </Modal>
     </Modal>
   );
