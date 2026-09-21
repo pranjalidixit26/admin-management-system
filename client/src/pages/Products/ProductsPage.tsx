@@ -28,7 +28,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const handleEdit = (product: Product) => {
+    const handleEdit = (product: Product) => {
     setEditingProduct(product);
     setFormOpen(true);
   };
@@ -83,6 +83,7 @@ export default function ProductsPage() {
         editingProduct={editingProduct}
         onSuccess={handleSuccess}
         onCancel={handleCancel}
+        onStockChange={() => setRefreshKey((prev) => prev + 1)}
       />
     </div>
   );

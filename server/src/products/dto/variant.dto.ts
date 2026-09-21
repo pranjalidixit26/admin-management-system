@@ -19,6 +19,10 @@ export class VariantImageDto {
 }
 
 export class VariantDto {
+  @IsNumber()
+  @IsOptional()
+  id?: number; // existing variant ki pehchaan, edit me ids na badlein
+
   @IsObject()
   @IsOptional()
   attributes?: Record<string, string>;

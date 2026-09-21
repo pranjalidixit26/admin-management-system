@@ -15,6 +15,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import { AdjustStockDto } from './dto/adjust-stock.dto';
 
 @Controller('products')
 export class ProductsController {
@@ -85,6 +86,16 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard)
   findOne(@Param('id') id: string) {
     return this.productsService.findOne(+id);
+  }
+
+  @Patch('variants/:variantId/stock')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('PRODUCT_EDIT')
+  adjustVariantStock(
+    @Param('variantId') variantId: string,
+    @Body() dto: AdjustStockDto,
+  ) {
+    return this.productsService.adjustVariantStock(+variantId, dto.delta);
   }
 
   @Patch(':id')

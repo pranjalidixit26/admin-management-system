@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal, Form, Input, InputNumber, Select, Switch, Button, Card, Space, Divider, AutoComplete } from 'antd';
+import { Modal, Form, Input, InputNumber, Select, Switch, Button, Card, Space, Divider, AutoComplete, message } from 'antd';
 import { PlusOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
 import api from '../../api/axios';
 
@@ -31,6 +31,7 @@ interface AttributeEntry {
 }
 
 interface VariantFormEntry {
+  id?: number;
   attributes?: AttributeEntry[];
   stock?: number;
   price?: number;
@@ -54,9 +55,10 @@ interface ProductFormProps {
   editingProduct: Product | null;
   onSuccess: () => void;
   onCancel: () => void;
+  onStockChange?: () => void;
 }
 
-export default function ProductForm({ open, editingProduct, onSuccess, onCancel }: ProductFormProps) {
+export default function ProductForm({ open, editingProduct, onSuccess, onCancel, onStockChange }: ProductFormProps) {
   const [form] = Form.useForm();
   const [categories, setCategories] = useState<Category[]>([]);
   const watchedVariants = Form.useWatch('variants', form) as VariantFormEntry[] | undefined;
@@ -73,6 +75,11 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
 
   const [loadingCategories, setLoadingCategories] = useState(false);
 
+  // "Adjust stock" modal ka state (sirf existing variants ke liye)
+  const [adjustTarget, setAdjustTarget] = useState<{ variantId: number; fieldName: number } | null>(null);
+  const [delta, setDelta] = useState<number | null>(null);
+  const [adjusting, setAdjusting] = useState(false);
+
   useEffect(() => {
     if (open) {
       setLoadingCategories(true);
@@ -87,6 +94,7 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
   useEffect(() => {
     if (editingProduct) {
       const formVariants: VariantFormEntry[] = (editingProduct.variants ?? []).map((v) => ({
+        id: v.id,
         attributes: Object.entries(v.attributes ?? {}).map(([key, value]) => ({ key, value })),
         stock: v.stock ?? 0,
         price: v.price ?? undefined,
@@ -129,8 +137,12 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
         });
 
         return {
-          attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
-          stock: v.stock ?? 0,
+          id: v.id,
+          // Existing variant me saare attributes hataye ho to {} bhejo, taaki backend unhe clear kare
+          attributes:
+            Object.keys(attributes).length > 0 ? attributes : v.id ? {} : undefined,
+          // Existing variant ka stock yahan se nahi jata, wo "Adjust stock" se badalta hai
+          stock: v.id ? undefined : v.stock ?? 0,
           price: v.price ?? undefined,
           images: (v.images ?? [])
             .filter((img: any) => img?.imageUrl)
@@ -138,7 +150,11 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
         };
       });
 
-      const payload = { ...values, variants };
+      // Edit me variants load hi na hue ho to bhejo mat, warna backend unhe hata dega
+      const payload =
+        editingProduct && editingProduct.variants === undefined
+          ? { ...values, variants: undefined }
+          : { ...values, variants };
 
       if (editingProduct) {
         await api.patch(`/products/${editingProduct.id}`, payload);
@@ -147,8 +163,31 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
       }
       form.resetFields();
       onSuccess();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      // Form validation error antd khud dikhata hai, sirf API error ka message dikhao
+      if (!err?.errorFields) {
+        const msg = err?.response?.data?.message;
+        message.error(Array.isArray(msg) ? msg.join(', ') : msg ?? 'Something went wrong');
+      }
+    }
+  };
+
+  const handleAdjustStock = async () => {
+    if (!adjustTarget || !delta) return;
+    setAdjusting(true);
+    try {
+      const res = await api.patch(`/products/variants/${adjustTarget.variantId}/stock`, { delta });
+      form.setFieldValue(['variants', adjustTarget.fieldName, 'stock'], res.data.stock);
+      message.success(`Stock updated: ${res.data.stock}`);
+      onStockChange?.();
+      setAdjustTarget(null);
+      setDelta(null);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message;
+      message.error(Array.isArray(msg) ? msg.join(', ') : msg ?? 'Stock update failed');
+    } finally {
+      setAdjusting(false);
     }
   };
 
@@ -174,9 +213,11 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
         <Form.Item name="price" label="Price" rules={[{ required: true, message: 'Please enter a price' }]}>
           <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
         </Form.Item>
-        <Form.Item name="stock" label="Stock">
-          <InputNumber min={0} style={{ width: '100%' }} />
-        </Form.Item>
+        {!editingProduct && (
+          <Form.Item name="stock" label="Stock" extra="Used only when you don't add any variants below">
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+        )}
         <Form.Item name="imageUrl" label="Image URL">
           <Input />
         </Form.Item>
@@ -221,6 +262,9 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
                     </Space>
                   }
                 >
+                  <Form.Item {...restField} name={[name, 'id']} hidden>
+                    <InputNumber />
+                  </Form.Item>
                   <div style={{ marginBottom: 8, fontWeight: 500 }}>Attributes</div>
                   <Form.List name={[name, 'attributes']}>
                     {(attrFields, { add: addAttr, remove: removeAttr }) => (
@@ -260,8 +304,20 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
 
                   <Space style={{ display: 'flex', marginTop: 16 }} align="baseline" wrap>
                     <Form.Item {...restField} name={[name, 'stock']} label="Stock">
-                      <InputNumber min={0} />
+                      <InputNumber min={0} disabled={!!form.getFieldValue(['variants', name, 'id'])} />
                     </Form.Item>
+                    {form.getFieldValue(['variants', name, 'id']) && (
+                      <Button
+                        onClick={() =>
+                          setAdjustTarget({
+                            variantId: form.getFieldValue(['variants', name, 'id']),
+                            fieldName: name,
+                          })
+                        }
+                      >
+                        Adjust stock
+                      </Button>
+                    )}
                     <Form.Item {...restField} name={[name, 'price']} label="Price (optional override)">
                       <InputNumber min={0} step={0.01} />
                     </Form.Item>
@@ -303,6 +359,22 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel 
           )}
         </Form.List>
       </Form>
+
+      <Modal
+        title="Adjust stock"
+        open={!!adjustTarget}
+        onOk={handleAdjustStock}
+        confirmLoading={adjusting}
+        okButtonProps={{ disabled: !delta }}
+        onCancel={() => {
+          setAdjustTarget(null);
+          setDelta(null);
+        }}
+        okText="Apply"
+      >
+        <p>Enter a positive number to add stock (e.g. 5) or a negative number to remove it (e.g. -3).</p>
+        <InputNumber precision={0} value={delta} onChange={setDelta} style={{ width: '100%' }} />
+      </Modal>
     </Modal>
   );
 }
