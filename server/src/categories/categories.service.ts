@@ -1,7 +1,8 @@
 import { Injectable, Inject, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, IsNull } from 'typeorm';
-import { Redis } from 'ioredis';
+import Redis from 'ioredis';
+import { REDIS_CLIENT } from '../redis/redis.module';
 import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -16,7 +17,8 @@ export class CategoriesService {
   constructor(
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
-    @Inject('REDIS_CLIENT') private readonly redis: Redis,
+    @Inject(REDIS_CLIENT)
+    private readonly redis: Redis,
   ) {}
 
   // Redis down ho to bhi API chalti rehni chahiye, isliye error sirf log hota hai
