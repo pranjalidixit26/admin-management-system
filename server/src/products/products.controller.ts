@@ -46,8 +46,10 @@ export class ProductsController {
       storage: memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
       fileFilter: (req, file, cb) => {
-        console.log('UPLOAD DEBUG - originalname:', file.originalname, 'mimetype:', file.mimetype);
-        if (!file.mimetype.startsWith('image/')) {
+        const allowedExtensions = /\.(jpg|jpeg|png|webp|gif)$/i;
+        const isValidMimetype = file.mimetype.startsWith('image/');
+        const isValidExtension = allowedExtensions.test(file.originalname);
+        if (!isValidMimetype && !isValidExtension) {
           return cb(new BadRequestException('Only image files are allowed'), false);
         }
         cb(null, true);
