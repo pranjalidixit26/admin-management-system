@@ -13,6 +13,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -42,8 +43,10 @@ export class ProductsController {
   @RequirePermission('PRODUCT_CREATE')
   @UseInterceptors(
     FileInterceptor('image', {
+      storage: memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
       fileFilter: (req, file, cb) => {
+        console.log('UPLOAD DEBUG - originalname:', file.originalname, 'mimetype:', file.mimetype);
         if (!file.mimetype.startsWith('image/')) {
           return cb(new BadRequestException('Only image files are allowed'), false);
         }
