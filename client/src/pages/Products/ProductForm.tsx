@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Modal, Form, Input, InputNumber, Select, Switch, Button, Card, Space, Divider, AutoComplete, Radio, message } from 'antd';
-import { PlusOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
+import { Modal, Form, Input, InputNumber, Select, Switch, Button, Card, Space, Divider, AutoComplete, Radio, message, Upload } from 'antd';
+import { PlusOutlined, DeleteOutlined, CopyOutlined, UploadOutlined } from '@ant-design/icons';
 import api from '../../api/axios';
 
 interface Category {
@@ -56,6 +56,54 @@ interface ProductFormProps {
   onSuccess: () => void;
   onCancel: () => void;
   onStockChange?: () => void;
+}
+
+function ImageUploadField({ value, onChange }: { value?: string; onChange?: (v: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await api.post('/products/upload-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      onChange?.(res.data.imageUrl);
+      message.success('Image uploaded');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message;
+      message.error(Array.isArray(msg) ? msg.join(', ') : msg ?? 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+    return false; // antd ka default auto-upload roko, humne khud handle kar liya
+  };
+
+  return (
+    <Space direction="vertical" style={{ width: '100%' }}>
+      <Space>
+        <Upload showUploadList={false} accept="image/*" beforeUpload={handleUpload}>
+          <Button loading={uploading} icon={<UploadOutlined />}>
+            Upload Image
+          </Button>
+        </Upload>
+        <Input
+          placeholder="Image URL"
+          value={value}
+          onChange={(e) => onChange?.(e.target.value)}
+          style={{ width: 260 }}
+        />
+      </Space>
+      {value && (
+        <img
+          src={value}
+          alt="preview"
+          style={{ maxHeight: 80, borderRadius: 4, objectFit: 'cover' }}
+        />
+      )}
+    </Space>
+  );
 }
 
 export default function ProductForm({ open, editingProduct, onSuccess, onCancel, onStockChange }: ProductFormProps) {
@@ -229,8 +277,8 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel,
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
         )}
-        <Form.Item name="imageUrl" label="Image URL">
-          <Input />
+        <Form.Item name="imageUrl" label="Image">
+            <ImageUploadField />
         </Form.Item>
         <Form.Item name="categoryId" label="Category" rules={[{ required: true, message: 'Please select a category' }]}>
           <Select
@@ -341,11 +389,11 @@ export default function ProductForm({ open, editingProduct, onSuccess, onCancel,
                         {imgFields.map(({ key: imgKey, name: imgName, ...imgRestField }) => (
                           <Space key={imgKey} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
                             <Form.Item
-                              {...imgRestField}
-                              name={[imgName, 'imageUrl']}
-                              style={{ marginBottom: 0, width: 400 }}
-                            >
-                              <Input placeholder="Image URL" />
+                                {...imgRestField}
+                                name={[imgName, 'imageUrl']}
+                                style={{ marginBottom: 0, width: 400 }}
+                                >
+                                <ImageUploadField />
                             </Form.Item>
                             <Button danger type="text" icon={<DeleteOutlined />} onClick={() => removeImg(imgName)} />
                           </Space>
