@@ -18,6 +18,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { RedisModule } from './redis/redis.module';
 import { MailModule } from './mail/mail.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     RedisModule,
     MailModule,
     DashboardModule,
+    CloudinaryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
