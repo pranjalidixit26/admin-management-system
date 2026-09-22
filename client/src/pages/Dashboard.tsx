@@ -84,23 +84,22 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
       setLoading(true);
       try {
-        const [usersRes, productsRes, categoriesRes, rolesRes, orderStatsRes, recentOrdersRes] = await Promise.all([
+        const [usersRes, productsRes, rolesRes, dashboardStatsRes, recentOrdersRes] = await Promise.all([
           api.get('/users', { params: { page: 1, limit: 1000 } }),
           api.get('/products', { params: { page: 1, limit: 1000 } }),
-          api.get('/categories', { params: { page: 1, limit: 1000 } }),
           api.get('/roles', { params: { page: 1, limit: 1000 } }),
-          api.get('/orders/admin/stats'),
+          api.get('/dashboard/stats'),
           api.get('/orders/admin', { params: { page: 1, limit: 5 } }),
         ]);
 
         const users: User[] = usersRes.data.data;
         const products: Product[] = productsRes.data.data;
-        const categories: Category[] = categoriesRes.data.data;
         const roles: Role[] = rolesRes.data.data;
+        const dashboardStats = dashboardStatsRes.data;
 
-        setUserCount(usersRes.data.total ?? users.length);
-        setProductCount(productsRes.data.total ?? products.length);
-        setCategoryCount(categoriesRes.data.total ?? categories.length);
+        setUserCount(dashboardStats.totalUsers);
+        setProductCount(dashboardStats.totalProducts);
+        setCategoryCount(dashboardStats.totalCategories);
         setActiveRoleCount(roles.filter((r) => r.status !== false).length);
 
         // Group products by category name
@@ -136,16 +135,11 @@ export default function Dashboard() {
             .slice(0, 5)
         );
 
-        // Total inventory value = sum(price * stock)
-        const totalValue = products.reduce(
-          (sum, p) => sum + Number(p.price) * Number(p.stock),
-          0
-        );
-        setInventoryValue(totalValue);
-        setTotalRevenue(orderStatsRes.data.totalRevenue ?? 0);
-        setTotalOrders(orderStatsRes.data.totalOrders ?? 0);
+        setInventoryValue(dashboardStats.inventoryValue ?? 0);
+        setTotalRevenue(dashboardStats.orders?.totalRevenue ?? 0);
+        setTotalOrders(dashboardStats.orders?.totalOrders ?? 0);
         setOrdersByStatus(
-          (orderStatsRes.data.statusBreakdown ?? []).map((s: { status: string; count: number }) => ({
+          (dashboardStats.orders?.statusBreakdown ?? []).map((s: { status: string; count: number }) => ({
             name: s.status.charAt(0).toUpperCase() + s.status.slice(1),
             count: s.count,
           }))
