@@ -6,6 +6,7 @@ import { ProductVariant } from '../products/entities/product-variant.entity';
 import { Category } from '../categories/entities/category.entity';
 import { Role } from '../roles/entities/role.entity';
 import { OrdersModule } from '../orders/orders.module';
+import { AuthModule } from '../auth/auth.module';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 
@@ -13,6 +14,7 @@ import { DashboardService } from './dashboard.service';
     imports: [
         TypeOrmModule.forFeature([User, Product, ProductVariant, Category, Role]),
         OrdersModule,
+        AuthModule,
     ],
     controllers: [DashboardController],
     providers: [DashboardService],
