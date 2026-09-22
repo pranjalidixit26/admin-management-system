@@ -399,10 +399,14 @@ export class OrdersService {
         }
 
         const result = await this.orderRepo
-            .createQueryBuilder('order')
-            .select('COUNT(order.id)', 'totalOrders')
-            .addSelect('COALESCE(SUM(order.totalAmount), 0)', 'totalRevenue')
-            .getRawOne();
+        .createQueryBuilder('order')
+        .select('COUNT(order.id)', 'totalOrders')
+        .addSelect(
+            'COALESCE(SUM(CASE WHEN order.status != :cancelled THEN order.totalAmount ELSE 0 END), 0)',
+            'totalRevenue',
+        )
+        .setParameter('cancelled', OrderStatus.CANCELLED)
+        .getRawOne();
 
         const statusRows = await this.orderRepo
             .createQueryBuilder('order')
