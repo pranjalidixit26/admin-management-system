@@ -17,6 +17,7 @@ import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { RedisModule } from './redis/redis.module';
 import { MailModule } from './mail/mail.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { MailModule } from './mail/mail.module';
     PaymentsModule,
     RedisModule,
     MailModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
