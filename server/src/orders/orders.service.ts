@@ -168,7 +168,10 @@ export class OrdersService {
     }
 
     async cancel(customerId: number, id: number) {
-        const order = await this.orderRepo.findOne({ where: { id } });
+        const order = await this.orderRepo.findOne({
+            where: { id },
+            relations: { items: true },
+        });
         if (!order) throw new NotFoundException('Order not found');
         if (order.customerId !== customerId) throw new ForbiddenException();
         if (order.status === OrderStatus.CANCELLED) {
@@ -177,8 +180,25 @@ export class OrdersService {
         if (order.status === OrderStatus.DELIVERED) {
             throw new BadRequestException('Delivered orders cannot be cancelled');
         }
-        order.status = OrderStatus.CANCELLED;
-        const saved = await this.orderRepo.save(order);
+
+        const saved = await this.dataSource.transaction(async (manager) => {
+            order.status = OrderStatus.CANCELLED;
+            const updatedOrder = await manager.save(order);
+
+            // Restore stock for every item in the cancelled order
+            for (const item of order.items) {
+                await manager.increment(
+                    'product_variants',
+                    { id: item.variantId },
+                    'stock',
+                    item.quantity,
+                );
+            }
+
+            return updatedOrder;
+        });
+
+        await this.bumpProductsCache();
         await this.clearAdminStatsCache();
         return saved;
     }
