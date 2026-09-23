@@ -124,14 +124,24 @@ export class OrdersService {
             const orderItems = orderItemsData.map((data) => manager.create(OrderItem, data));
             await manager.save(orderItems);
 
-            // Deduct stock
+            // Deduct stock — atomic, race-safe (only decrements if enough stock remains)
             for (const item of cart.items) {
-                await manager.decrement(
-                    'product_variants',
-                    { id: item.variant.id },
-                    'stock',
-                    item.quantity,
-                );
+                const result = await manager
+                    .createQueryBuilder()
+                    .update('product_variants')
+                    .set({ stock: () => 'stock - :qty' })
+                    .where('id = :id AND stock >= :qty', {
+                        id: item.variant.id,
+                        qty: item.quantity,
+                    })
+                    .setParameter('qty', item.quantity)
+                    .execute();
+
+                if (result.affected === 0) {
+                    throw new BadRequestException(
+                        `Insufficient stock for ${item.variant.product.name}`,
+                    );
+                }
             }
 
             // Clear cart
