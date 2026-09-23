@@ -22,6 +22,7 @@ import { RedisModule } from './redis/redis.module';
 import { MailModule } from './mail/mail.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { WishlistModule } from './wishlist/wishlist.module';
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
     MailModule,
     DashboardModule,
     CloudinaryModule,
+    WishlistModule,
   ],
   controllers: [AppController],
   providers: [
