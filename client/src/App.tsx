@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { CartProvider } from './context/CartContext';
+import { WishlistProvider } from './context/WishlistContext';
 import AppLayout from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import UsersPage from './pages/Users/UsersPage';
@@ -13,6 +14,7 @@ import CategoriesPage from './pages/Categories/CategoriesPage';
 import ProductsPage from './pages/Products/ProductsPage';
 import CustomerLogin from './pages/CustomerLogin';
 import Cart from './pages/Cart';
+import Wishlist from './pages/Wishlist';
 import CustomerProfile from './pages/CustomerProfile';
 import OrderConfirmation from './pages/OrderConfirmation';
 import OrderHistory from './pages/OrderHistory';
@@ -23,6 +25,7 @@ function App() {
     return (
     <BrowserRouter>
       <CartProvider>
+      <WishlistProvider>
       <Routes>
         <Route path="/" element={<Home />} />
 
@@ -32,6 +35,7 @@ function App() {
 
         <Route path="/customer-login" element={<CustomerLogin />} />
         <Route path="/cart" element={<Cart />} />
+        <Route path="/wishlist" element={<Wishlist />} />
         <Route path="/account" element={<CustomerProfile />} />
         <Route path="/order-confirmation/:id" element={<OrderConfirmation />} />
         <Route path="/orders" element={<OrderHistory />} />
@@ -49,6 +53,7 @@ function App() {
           </Route>
         </Route>
         </Routes>
+      </WishlistProvider>
       </CartProvider>
     </BrowserRouter>
   );

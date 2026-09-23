@@ -4,10 +4,12 @@ import {
     Post,
     Delete,
     Param,
+    Body,
     Req,
     UseGuards,
 } from '@nestjs/common';
 import { WishlistService } from './wishlist.service';
+import { AddWishlistItemDto } from './dto/add-wishlist-item.dto';
 import { CustomerJwtAuthGuard } from '../customer-auth/customer-jwt-auth.guard';
 
 @Controller('wishlist')
@@ -26,8 +28,8 @@ export class WishlistController {
     }
 
     @Post(':productId')
-    addItem(@Req() req: any, @Param('productId') productId: string) {
-        return this.wishlistService.addItem(req.user.customerId, +productId);
+    addItem(@Req() req: any, @Param('productId') productId: string, @Body() dto: AddWishlistItemDto) {
+        return this.wishlistService.addItem(req.user.customerId, +productId, dto.variantId);
     }
 
     @Delete(':productId')

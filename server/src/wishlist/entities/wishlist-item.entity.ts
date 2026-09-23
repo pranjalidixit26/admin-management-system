@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { Customer } from '../../customers/entities/customer.entity';
 import { Product } from '../../products/entities/product.entity';
+import { ProductVariant } from '../../products/entities/product-variant.entity';
 
 @Entity('wishlist_items')
 @Unique(['customer', 'product'])
@@ -22,6 +23,10 @@ export class WishlistItem {
     @ManyToOne(() => Product, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'product_id' })
     product: Product;
+
+    @ManyToOne(() => ProductVariant, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'variant_id' })
+    variant: ProductVariant | null;
 
     @CreateDateColumn()
     created_at: Date;

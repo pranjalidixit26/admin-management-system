@@ -6,6 +6,7 @@ import axios from 'axios';
 import './Home.css';
 import NetworkBackground from '../components/NetworkBackground';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
 
 interface CustomerInfo {
   id: number;
@@ -58,7 +59,28 @@ export default function Home() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [selectedQty, setSelectedQty] = useState<number>(1);
     const { addToCart, totalItems } = useCart();
+    const { wishlistedProductIds, addToWishlist, removeFromWishlist } = useWishlist();
   const navigate = useNavigate();
+
+  const handleToggleWishlist = async (e: React.MouseEvent, productId: number, variantId?: number) => {
+    e.stopPropagation();
+    if (!customer) {
+      message.warning('Please login to use your wishlist');
+      navigate('/customer-login');
+      return;
+    }
+    try {
+      if (wishlistedProductIds.has(productId)) {
+        await removeFromWishlist(productId);
+        message.success('Removed from wishlist');
+      } else {
+        await addToWishlist(productId, variantId);
+        message.success('Added to wishlist');
+      }
+    } catch {
+      message.error('Could not update wishlist');
+    }
+  };
 
   const handleAddToCart = async (variantId: number, qty: number) => {
     if (!customer) {
@@ -481,6 +503,35 @@ export default function Home() {
                     ) : (
                       <div className="home-product-image-placeholder" />
                     )}
+                    <button
+                      onClick={(e) => handleToggleWishlist(e, p.id, singleVariant?.id)}
+                      style={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        width: 32,
+                        height: 32,
+                        borderRadius: '50%',
+                        border: 'none',
+                        background: 'rgba(255,255,255,0.9)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                    >
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill={wishlistedProductIds.has(p.id) ? '#ef4444' : 'none'}
+                        stroke={wishlistedProductIds.has(p.id) ? '#ef4444' : '#374151'}
+                        strokeWidth="2"
+                      >
+                        <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z" />
+                      </svg>
+                    </button>
                   </div>
                   <div className="home-product-info">
                     {p.category && <span className="home-product-category">{p.category.name}</span>}
@@ -665,7 +716,30 @@ export default function Home() {
                   {selectedProduct.category.name}
                 </span>
               )}
-              <h2 style={{ margin: '6px 0', fontSize: 22 }}>{selectedProduct.name}</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0' }}>
+                <h2 style={{ margin: 0, fontSize: 22 }}>{selectedProduct.name}</h2>
+                <button
+                  onClick={(e) => handleToggleWishlist(e, selectedProduct.id, selectedVariant?.id)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    padding: 4,
+                    display: 'flex',
+                  }}
+                >
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill={wishlistedProductIds.has(selectedProduct.id) ? '#ef4444' : 'none'}
+                    stroke={wishlistedProductIds.has(selectedProduct.id) ? '#ef4444' : '#374151'}
+                    strokeWidth="2"
+                  >
+                    <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z" />
+                  </svg>
+                </button>
+              </div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#1f2937', marginBottom: 8 }}>
                 ₹{selectedVariant?.price ?? selectedProduct.price}
               </div>
