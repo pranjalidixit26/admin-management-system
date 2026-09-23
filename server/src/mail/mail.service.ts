@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { Resend } from 'resend';
 import { Order } from '../orders/order.entity';
 
@@ -22,7 +24,7 @@ export class MailService {
     private readonly from: string;
     private readonly testTo?: string;
 
-    constructor() {
+    constructor(@InjectQueue('mail') private readonly mailQueue: Queue) {
         const key = process.env.RESEND_API_KEY;
         this.resend = key ? new Resend(key) : null;
         this.from = process.env.MAIL_FROM ?? 'ShopNest <onboarding@resend.dev>';
@@ -68,7 +70,7 @@ export class MailService {
         };
     }
 
-    // Kabhi throw nahi karta: mail fail ho to bhi status update fail nahi hona chahiye
+    // Kabhi throw nahi karta: queue me daalna fail ho to bhi status update fail nahi hona chahiye
     async sendOrderStatusEmails(orders: Order[]): Promise<void> {
         if (!this.resend) return;
         try {
@@ -76,12 +78,23 @@ export class MailService {
                 .map((o) => this.buildEmail(o))
                 .filter((e): e is MailPayload => e !== null);
 
-            for (let i = 0; i < emails.length; i += 100) {
-                const { error } = await this.resend.batch.send(emails.slice(i, i + 100));
-                if (error) this.logger.error(`Resend batch failed: ${error.message}`);
-            }
+            if (emails.length === 0) return;
+
+            await this.mailQueue.add(
+                'send-order-status',
+                { emails },
+                { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
+            );
         } catch (err) {
-            this.logger.error('Failed to send order status emails', (err as Error).stack);
+            this.logger.error('Failed to queue order status emails', (err as Error).stack);
+        }
+    }
+
+    // Processor isse call karega actual Resend batch-send ke liye
+    async sendBatch(emails: MailPayload[]): Promise<void> {
+        for (let i = 0; i < emails.length; i += 100) {
+            const { error } = await this.resend!.batch.send(emails.slice(i, i + 100));
+            if (error) throw new Error(`Resend batch failed: ${error.message}`);
         }
     }
 }
