@@ -19,6 +19,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { VariantDto } from './dto/variant.dto';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from '../redis/redis.module';
+import { Review } from '../reviews/entities/review.entity';
 
 const PRODUCTS_VERSION_KEY = 'products:version';
 const FILTERS_TTL = 3600; 
@@ -37,6 +38,8 @@ export class ProductsService {
     private readonly productVariantImageRepository: Repository<ProductVariantImage>,
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
+    @InjectRepository(Review)
+    private readonly reviewRepository: Repository<Review>,
     @Inject(REDIS_CLIENT)
     private readonly redis: Redis,
   ) {}
@@ -258,14 +261,45 @@ export class ProductsService {
     const orderIndex = new Map(ids.map((id, idx) => [id, idx]));
     data.sort((a, b) => orderIndex.get(a.id)! - orderIndex.get(b.id)!);
 
+    const ratingsMap = await this.getRatingsMap(ids);
+    const dataWithRatings = data.map((product) => ({
+      ...product,
+      averageRating: ratingsMap.get(product.id)?.averageRating ?? 0,
+      reviewCount: ratingsMap.get(product.id)?.reviewCount ?? 0,
+    }));
+
     return {
-      data,
+      data: dataWithRatings,
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
     };
   }
+
+    private async getRatingsMap(
+      productIds: number[],
+    ): Promise<Map<number, { averageRating: number; reviewCount: number }>> {
+      if (productIds.length === 0) return new Map();
+
+      const rows = await this.reviewRepository
+        .createQueryBuilder('review')
+        .select('review.productId', 'productId')
+        .addSelect('AVG(review.rating)', 'avgRating')
+        .addSelect('COUNT(review.id)', 'reviewCount')
+        .where('review.productId IN (:...productIds)', { productIds })
+        .groupBy('review.productId')
+        .getRawMany();
+
+      const map = new Map<number, { averageRating: number; reviewCount: number }>();
+      rows.forEach((r) => {
+        map.set(Number(r.productId), {
+          averageRating: Math.round(parseFloat(r.avgRating) * 10) / 10,
+          reviewCount: Number(r.reviewCount),
+        });
+      });
+      return map;
+    }
 
   async getPublicFilters(categoryId?: number): Promise<Record<string, string[]>> {
     const version = await this.getCacheVersion();
