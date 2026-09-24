@@ -42,6 +42,8 @@ interface Product {
   category: { id: number; name: string } | null;
   status: boolean;
   variants: ProductVariant[];
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 export default function Home() {
@@ -508,6 +510,30 @@ export default function Home() {
                       <img src={p.imageUrl} alt={p.name} />
                     ) : (
                       <div className="home-product-image-placeholder" />
+                    )}
+                    {(p.reviewCount ?? 0) > 0 && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 48,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 3,
+                          background: 'rgba(255,255,255,0.9)',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+                          borderRadius: 20,
+                          padding: '4px 8px',
+                        }}
+                      >
+                        <span style={{ color: '#fbbf24', fontSize: 12 }}>★</span>
+                        <span style={{ fontSize: 12, color: '#374151', fontWeight: 600 }}>
+                          {p.averageRating}
+                        </span>
+                        <span style={{ fontSize: 11, color: '#9ca3af' }}>
+                          ({p.reviewCount})
+                        </span>
+                      </div>
                     )}
                     <button
                       onClick={(e) => handleToggleWishlist(e, p.id, singleVariant?.id)}
