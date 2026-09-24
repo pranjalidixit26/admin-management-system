@@ -307,6 +307,11 @@ export default function Home() {
           <span className="home-logo-text">ShopNest</span>
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        <Link to="/wishlist" style={{ cursor: 'pointer', display: 'flex' }}>
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z" />
+          </svg>
+        </Link>
         <Link to="/cart" style={{ position: 'relative', cursor: 'pointer', display: 'flex' }}>
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="9" cy="21" r="1" />
@@ -514,6 +519,7 @@ export default function Home() {
                         borderRadius: '50%',
                         border: 'none',
                         background: 'rgba(255,255,255,0.9)',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
