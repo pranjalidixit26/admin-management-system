@@ -7,6 +7,7 @@ import './Home.css';
 import NetworkBackground from '../components/NetworkBackground';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import ProductReviews from '../components/ProductReviews';
 
 interface CustomerInfo {
   id: number;
@@ -894,6 +895,9 @@ export default function Home() {
               </button>
             </div>
           </div>
+        )}
+        {selectedProduct && (
+          <ProductReviews productId={selectedProduct.id} isLoggedIn={!!customer} />
         )}
       </Modal>
     </div>
