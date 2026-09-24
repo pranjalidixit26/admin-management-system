@@ -23,6 +23,7 @@ import { MailModule } from './mail/mail.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { WishlistModule } from './wishlist/wishlist.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 @Module({
   imports: [
@@ -90,6 +91,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
     DashboardModule,
     CloudinaryModule,
     WishlistModule,
+    ReviewsModule,
   ],
   controllers: [AppController],
   providers: [
